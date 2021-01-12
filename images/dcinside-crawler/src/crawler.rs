@@ -15,10 +15,10 @@ use select::predicate::{Attr};
 
 
 
+use log::{error};
 
 
 
-use exponential_backoff::Backoff;
 
 
 #[allow(non_snake_case)]
@@ -35,12 +35,23 @@ struct CommentsPostForm<'a> {
     _GALLTYPE_: &'a str,
 }
 
+async fn back_off<F, O, E>(delay: usize, max_delay: usize, f: impl Fn() -> F) -> Result<O, E>
+where F: futures::Future<Output = Result<O, E>>,
+{
+    let mut i = 0;
+    loop {
+        let res = f().await;
+        if res.is_ok() || i*delay >= max_delay {
+            break res;
+        }
+        i += 1;
+    }
+}
 
 #[derive(Clone)]
 pub struct Crawler {
     pub client: Client,
     host: String,
-    backoff: Backoff,
     e_s_n_o: Option<String>,
     delay: Duration,
 }
@@ -55,7 +66,6 @@ impl<'a> Crawler {
         Crawler {
             client,
             host: String::from("https://gall.dcinside.com"),
-            backoff: Backoff::new(8, Duration::from_millis(100), Duration::from_secs(10)),
             e_s_n_o: None,
             delay: Duration::from_millis(100),
         }
@@ -70,13 +80,13 @@ impl<'a> Crawler {
             jsonp_callback_func,
             Utc::now().timestamp_millis()
         );
-        let bytes = backoff::tokio::retry(backoff::ExponentialBackoff::default(), || async {
-            Ok(self
+        let bytes = back_off(1000, 1000*60, || async {
+            Ok::<_, CrawlerError>(self
                 .client
                 .get(path.as_str())
                 .header("Referer", "https://gall.dcinside.com/")
-                .send().await.map_err(CrawlerError::from)?
-                .body().await.map_err(CrawlerError::from)?)
+                .send().await?
+                .body().await?)
         })
         .await?;
         let text = std::str::from_utf8(&bytes)?;
@@ -203,21 +213,21 @@ impl<'a> Crawler {
             prevCnt: 0,
             _GALLTYPE_: "G",
         };
-        let bytes = backoff::tokio::retry(backoff::ExponentialBackoff::default(), || async {
-            Ok(self
-                .client
-                .post(path.as_str())
-                .header("Accept", "application/json, text/javascript, */*; q=0.01")
-                .header("Accept-Encoding", "gzip, deflate, br")
-                .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-                .header("Origin", "https://gall.dcinside.com")
-                .header("Host", "gall.dcinside.com")
-                .header("Referer", format!("https://gall.dcinside.com/board/view/?id={}&no={}&_rk=tDl&page=1", gallery.id, doc_id))
-                .header("X-Requested-With", "XMLHttpRequest")
-                .header("Cache-Control", "no-cache")
-                .header("Pragma", "no-cache")
-                .send_form(&form).await.map_err(CrawlerError::from)?
-                .body().await.map_err(CrawlerError::from)?)
+        let bytes = back_off(1000, 1000*60, || async {
+            Ok::<_, CrawlerError>(self
+               .client
+               .post(path.as_str())
+               .header("Accept", "application/json, text/javascript, */*; q=0.01")
+               .header("Accept-Encoding", "gzip, deflate, br")
+               .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+               .header("Origin", "https://gall.dcinside.com")
+               .header("Host", "gall.dcinside.com")
+               .header("Referer", format!("https://gall.dcinside.com/board/view/?id={}&no={}&_rk=tDl&page=1", gallery.id, doc_id))
+               .header("X-Requested-With", "XMLHttpRequest")
+               .header("Cache-Control", "no-cache")
+               .header("Pragma", "no-cache")
+               .send_form(&form).await?
+               .body().await?)
         }).await?;
         let text = std::str::from_utf8(&bytes)?;
         Ok(parse_comments(text, &gallery.id, doc_id, last_root_comment_id)?)
@@ -238,13 +248,13 @@ impl<'a> Crawler {
             ),
             _ => panic!("What's this?"),
         };
-        let bytes = backoff::tokio::retry(backoff::ExponentialBackoff::default(), || async {
-            Ok(self
+        let bytes = back_off(1000, 1000*60, || async {
+            Ok::<_, CrawlerError>(self
                 .client
                 .get(path.as_str())
                 .header("Referer", "https://gall.dcinside.com/")
-                .send().await.map_err(CrawlerError::from)?
-                .body().await.map_err(CrawlerError::from)?)
+                .send().await?
+                .body().await?)
         }).await?;
         let text = std::str::from_utf8(&bytes)?;
         self.e_s_n_o = Some(HTMLDocument::from(text)
