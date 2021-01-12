@@ -16,7 +16,7 @@ repositories:
 
 helmDefaults:
   wait: true
-  timeout: 300
+  timeout: 60
   atomic: true
   cleanupOnFail: false
 
@@ -38,10 +38,10 @@ releases:
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool
     worker:
-      image: "gcr.io/"
+      image: "gcr.io/community-gamification-283222/dcinside-crawler:3cefec8"
       nodeSelector:
         cloud.google.com/gke-nodepool: pvm-g1-small-pool
     liveDirectory:
-      image: "gcr.io/"
+      image: "gcr.io/community-gamification-283222/dcinside-crawler:3cefec8"
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool

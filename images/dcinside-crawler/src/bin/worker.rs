@@ -89,7 +89,9 @@ impl State {
     async fn run(&mut self) -> Result<ResultMetric, WorkerError> {
         let gallery_states = self.fetch_gallery_list().await?;
         let mut metric = ResultMetric::default();
-        for gallery_state in gallery_states {
+        let len = gallery_states.len();
+        for (i, gallery_state) in gallery_states.into_iter().enumerate() {
+            info!("{}/{} start", i, len);
             let now = chrono::Utc::now();
             let res = if let Some(last_crawled_document_id) = gallery_state.last_crawled_document_id {
                 self.crawler.documents_after(&gallery_state.index, last_crawled_document_id, self.start_page).await
@@ -191,7 +193,7 @@ async fn main() -> std::io::Result<()> {
     let live_directory_url = std::env::var("LIVE_DIRECTORY_URL").expect("LIVE_DIRECTORY_URL");
     let data_broker_url = std::env::var("DATA_BROKER_URL").expect("DATA_BROKER_URL");
 
-    let part: u64 = std::env::var("PART").expect("PART").parse().expect("TOTAL");
+    let part: u64 = std::env::var("PART").expect("PART").parse().expect("PART");
     let total: u64 = std::env::var("TOTAL").expect("TOTAL").parse().expect("TOTAL");
 
     let prometheus = PrometheusMetrics::new("api", Some("/metrics"), None);
@@ -213,15 +215,20 @@ async fn main() -> std::io::Result<()> {
     reg.register(Box::new(metrics.comment_error.clone())).unwrap();
 
     actix_rt::spawn(async move { 
-        let state = State::new(
-            &live_directory_url, 
-            &data_broker_url,
-            total,
-            part);
-        crawl_forever(
-            state, 
-            Duration::from_secs(60), 
-            metrics.clone()).await;
+        loop {
+            let state = State::new(
+                &live_directory_url, 
+                &data_broker_url,
+                total,
+                part);
+            let res = crawl_forever(
+                state, 
+                Duration::from_secs(60), 
+                metrics.clone()).await;
+            if let Err(e) = res {
+                error!("crawler restart due to: {}", e.to_string());
+            }
+        }
     });
     HttpServer::new(move || {
         App::new()

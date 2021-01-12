@@ -677,6 +677,7 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "prometheus",
+ "rand 0.8.1",
  "select",
  "serde",
  "serde-aux",

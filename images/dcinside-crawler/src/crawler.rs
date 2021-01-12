@@ -57,7 +57,7 @@ impl<'a> Crawler {
             host: String::from("https://gall.dcinside.com"),
             backoff: Backoff::new(8, Duration::from_millis(100), Duration::from_secs(10)),
             e_s_n_o: None,
-            delay: Duration::from_millis(300),
+            delay: Duration::from_millis(100),
         }
     }
     pub async fn realtime_hot_galleries(&self) -> Result<Vec<GalleryIndex>, CrawlerError> {
@@ -108,6 +108,7 @@ impl<'a> Crawler {
                 break;
             }
             actix::clock::delay_for(self.delay).await;
+            //actix::clock::delay_for(Duration::from_millis((rand::random::<f32>() * 1000.0) as u64)).await;
         }
         Ok(docs.into_iter().filter(|t| match t { Ok(d) => d.id > last_document_id, Err(_e) => true } ).collect())
     }
@@ -118,12 +119,16 @@ impl<'a> Crawler {
     ) -> Result<Vec<Comment>, CrawlerError> {
         let mut comms = Vec::new();
         for i in 1..1000 {
-            let next_comms = self._comments(&gallery, doc_id, i, None).await?;
+            let (next_comms, max_page) = self._comments(&gallery, doc_id, i, None).await.unwrap();
             if next_comms.is_empty() {
                 break;
             }
             actix::clock::delay_for(self.delay).await;
+            //actix::clock::delay_for(Duration::from_millis((rand::random::<f32>() * 1000.0) as u64)).await;
             comms.extend(next_comms.into_iter().rev());
+            if max_page <= i {
+                break;
+            }
         }
         Ok(comms.into_iter().rev().collect())
     }
@@ -182,7 +187,7 @@ impl<'a> Crawler {
         doc_id: usize,
         page: usize,
         last_root_comment_id: Option<usize>,
-    ) -> Result<Vec<Comment>, CrawlerError> {
+    ) -> Result<(Vec<Comment>, usize), CrawlerError> {
         let path = format!("{}/board/comment", self.host);
         if self.e_s_n_o.is_none() {
             self.document_indexes(&gallery, 1).await?;
@@ -194,7 +199,7 @@ impl<'a> Crawler {
             cmt_no: doc_id,
             e_s_n_o: self.e_s_n_o.as_deref(),
             comment_page: page,
-            sort: "D",
+            sort: if page == 1 { "" } else { "D" },
             prevCnt: 0,
             _GALLTYPE_: "G",
         };
@@ -202,8 +207,15 @@ impl<'a> Crawler {
             Ok(self
                 .client
                 .post(path.as_str())
+                .header("Accept", "application/json, text/javascript, */*; q=0.01")
+                .header("Accept-Encoding", "gzip, deflate, br")
+                .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                .header("Origin", "https://gall.dcinside.com")
+                .header("Host", "gall.dcinside.com")
                 .header("Referer", format!("https://gall.dcinside.com/board/view/?id={}&no={}&_rk=tDl&page=1", gallery.id, doc_id))
                 .header("X-Requested-With", "XMLHttpRequest")
+                .header("Cache-Control", "no-cache")
+                .header("Pragma", "no-cache")
                 .send_form(&form).await.map_err(CrawlerError::from)?
                 .body().await.map_err(CrawlerError::from)?)
         }).await?;
@@ -311,19 +323,42 @@ mod tests {
     async fn comments() {
         let mut crawler = Crawler::new();
         let gallery = GalleryIndex {
-            id: String::from("programming"),
+            
+            id: String::from("comic_new2"),
             name: String::from("프로그래밍"),
             kind: GalleryKind::Major,
             rank: None,
         };
-        let res = crawler.comments(&gallery, 1586201).await.unwrap();
+        let res = crawler.comments(&gallery, 7850325).await.unwrap();
         assert!(!res.is_empty());
-        assert!(res.len() >= 2);
+        assert!(res.len() >= 1);
         assert!(!res.iter().any(|c| match &c.author {
             User::Static { id, ..  } => id.is_empty(),
             User::Dynamic { ip, .. } => ip.is_empty(),
             _ => false,
         }));
+        /*assert!(res.iter().any(|c| d.comment_count > 0));
+        assert!(res.iter().any(|c| if DocumentKind::Picture == d.kind {
+            true
+        } else {
+            false
+        }));*/
+    }
+    #[actix_rt::test]
+    async fn documents() {
+        let mut crawler = Crawler::new();
+        let gallery = GalleryIndex {
+            id: String::from("comic_new2"),
+            name: String::from("프로그래밍"),
+            kind: GalleryKind::Major,
+            rank: None,
+        };
+        let res = crawler.documents(&gallery, 2).await.unwrap();
+        assert!(!res.is_empty());
+        assert!(res.len() >= 1);
+        for d in res {
+            assert!(d.is_ok());
+        }
         /*assert!(res.iter().any(|c| d.comment_count > 0));
         assert!(res.iter().any(|c| if DocumentKind::Picture == d.kind {
             true

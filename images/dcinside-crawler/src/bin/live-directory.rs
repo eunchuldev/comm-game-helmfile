@@ -193,8 +193,16 @@ async fn main() -> std::io::Result<()> {
     };
     let db = db.open_tree("galleries").unwrap();
 
-    let state = State::with_db(db.clone());
-    actix_rt::spawn(async move { update_forever(state, Duration::from_secs(60), counter.clone()).await; });
+    let db2 = db.clone();
+    actix_rt::spawn(async move {
+        loop {
+            let state = State::with_db(db2.clone());
+            let res = update_forever(state, Duration::from_secs(60), counter.clone()).await; 
+            if let Err(e) = res {
+                error!("updator restart due to: {}", e.to_string());
+            }
+        }
+    });
     HttpServer::new(move || {
         let state = State::with_db(db.clone());
         App::new()

@@ -20,6 +20,8 @@ metadata:
     app: dc-crawler-live-dir
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: dc-crawler-live-dir
@@ -32,7 +34,7 @@ spec:
         prometheus.io/port: '8080'
     spec:
       nodeSelector:
-        {{ toYaml | .Values.dataBroker.nodeSelector | indent 8 }}
+        {{ toYaml .Values.dataBroker.nodeSelector | indent 8 }}
       volumes:
       - name: db
         persistentVolumeClaim:
@@ -46,6 +48,8 @@ spec:
           value: "8080"
         - name: STORE_PATH
           value: "/db/store"
+        - name: RUST_LOG
+          value: "INFO"
         volumeMounts:
         - mountPath: /db
           name: db

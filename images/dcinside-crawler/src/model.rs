@@ -241,32 +241,41 @@ pub fn parse_document_indexes(
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 struct _CommentsResponse {
     comments: Option<Vec<Comment>>,
+    pagination: Option<String>,
 }
 pub fn parse_comments(
     body: &str,
     gallery_id: &str,
     document_id: usize,
     last_root_comment_id: Option<usize>,
-) -> Result<Vec<Comment>, CommentParseError> {
+) -> Result<(Vec<Comment>, usize), CommentParseError> {
     let body: _CommentsResponse = serde_json::from_str(body).map_err(|e| CommentParseError::JsonParse {
         source: e,
+        target: body.to_string(),
         gallery_id: gallery_id.to_string(),
         doc_id: document_id,
     })?;
-    if let Some(mut comments) = body.comments {
-        let mut last_root_comment_id = if let Some(id) = last_root_comment_id { id } else { 0usize };
-        for c in comments.iter_mut() {
-            c.document_id = document_id;
-            c.gallery_id = gallery_id.to_string();
-            if c.depth == 0 {
-                last_root_comment_id = c.id;
-            } else if last_root_comment_id > 0 {
-                c.parent_id = Some(last_root_comment_id);
+    match body.pagination {
+        None => Ok((Vec::new(), 0)),
+        Some(pagination) => {
+            let doc = HTMLDocument::from(pagination.as_ref());
+            let max_page = doc.select(Name("em").or(Name("a"))).map(|t| t.text().parse::<usize>().unwrap_or(0)).fold(0usize, |acc, x| if acc > x { acc } else { x });
+            if let Some(mut comments) = body.comments {
+                let mut last_root_comment_id = if let Some(id) = last_root_comment_id { id } else { 0usize };
+                for c in comments.iter_mut() {
+                    c.document_id = document_id;
+                    c.gallery_id = gallery_id.to_string();
+                    if c.depth == 0 {
+                        last_root_comment_id = c.id;
+                    } else if last_root_comment_id > 0 {
+                        c.parent_id = Some(last_root_comment_id);
+                    }
+                }
+                Ok((comments, max_page))
+            } else {
+                Ok((Vec::new(), max_page))
             }
         }
-        Ok(comments)
-    } else {
-        Ok(Vec::new())
     }
 }
 
@@ -303,8 +312,9 @@ mod tests {
     }
     #[test]
     fn it_parses_comments() {
-        let res = parse_comments(include_str!("../assets/comments.json"), "gallery_id", 1, None).unwrap();
+        let (res, max_page) = parse_comments(include_str!("../assets/comments.json"), "gallery_id", 1, None).unwrap();
         assert!(!res.is_empty());
+        assert!(max_page == 10usize);
         assert!(res.len() >= 50);
         assert!(!res.iter().any(|c| match &c.author {
             User::Static { id, ..  } => id.is_empty(),

@@ -4,10 +4,10 @@ data:
     [sinks.gcs]
     type = "gcp_cloud_storage"
     inputs = ["logs"]
-    bucket = {{ .Values.dataBroker.bucket }}
+    bucket = {{ .Values.dataBroker.bucket | quote }}
     compression = "gzip"
     encoding.codec = "ndjson"
-    key_prefix = {{ .Values.dataBroker.prefix }}
+    key_prefix = {{ .Values.dataBroker.prefix | quote }}
 
     [sources.logs]
     address = "0.0.0.0:8080"

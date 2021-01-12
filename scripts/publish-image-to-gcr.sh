@@ -2,9 +2,8 @@
 
 set -e
 
-prefix="sa-kube"
 IMAGE="$1"
-TAG="${2:-$NAMESPACE}"
+TAG="$(git rev-parse --short HEAD)"
 
 if [ -z "$IMAGE" ]; then
   echo "image-name is missing."
@@ -18,8 +17,6 @@ if [ -z "$TAG" ]; then
 fi
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../" >/dev/null 2>&1 && pwd )"
-
-eval "$(aws ecr get-login --no-include-email)"
 
 for dir in "$ROOT"/images/*
 do
@@ -40,13 +37,11 @@ do
   name=$(echo "$name" | sed 's/^[0-9_\-]*//g')
   echo $name
   if [ "$IMAGE" == "$name" ]; then 
-    rep="${prefix}/${name}"
-    aws ecr create-repository --repository-name "$rep" || true
-    url=$(aws ecr describe-repositories --repository-names "$rep" --query repositories[0].repositoryUri | tr -d \")
+    url="gcr.io/${GCP_PROJECT}/${IMAGE}"
     DOCKER_BUILDKIT=1 docker tag "$name:$TAG" "$url:$TAG"
     DOCKER_BUILDKIT=1 docker push "$url:$TAG"
     RESULT="$RESULT
-$url"
+$url:$TAG"
   fi
 done
 

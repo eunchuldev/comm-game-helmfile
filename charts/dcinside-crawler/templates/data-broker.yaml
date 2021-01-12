@@ -21,7 +21,7 @@ spec:
             - name: "LOG"
               value: "warn"
             - name: "GOOGLE_APPLICATION_CREDENTIALS"
-              value: "/run/data-access/service-account/json"
+              value: "/run/data-access/service-account.json"
           image: "timberio/vector:0.11.X-alpine"
           imagePullPolicy: "IfNotPresent"
           name: "main"
@@ -41,7 +41,7 @@ spec:
           secret:
             secretName: data-access
       nodeSelector:
-        {{ toYaml | .Values.dataBroker.nodeSelector | indent 8 }}
+        {{ toYaml .Values.dataBroker.nodeSelector | indent 8 }}
 
 ---
 

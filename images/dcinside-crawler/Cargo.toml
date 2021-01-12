@@ -36,3 +36,5 @@ actix-web-prom = "0.5"
 prometheus = "0.11"
 
 pretty_env_logger = "0.4"
+
+rand = "0.8"

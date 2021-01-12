@@ -22,9 +22,10 @@ pub enum CommentParseError {
     NumberParse { path: &'static str },
     #[error(display = "fail to parse `{}`", path)]
     DatetimeParse { path: &'static str },
-    #[error(display = "fail to parse: {}.{}", gallery_id, doc_id )]
+    #[error(display = "fail to parse at {}.{} due to {}. body: {}", gallery_id, doc_id, source, target )]
     JsonParse{
         source: serde_json::Error,
+        target: String,
         doc_id: usize, 
         gallery_id: String,
     },
