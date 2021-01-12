@@ -1,0 +1,9 @@
+schemaVersion: 2.0.0
+fileExistenceTests:
+- name: 'scripts'
+  path: '/scripts'
+  shouldExist: true
+commandTests:
+- name: "pytest"
+  command: "python"
+  args: ["-m", "pytest", "/scripts"]

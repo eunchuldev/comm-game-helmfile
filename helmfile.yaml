@@ -1,0 +1,47 @@
+environments:
+  dev:
+    secrets:
+    - "envs/{{ .Environment.Name }}/data-access-secrets.yaml"
+    values:
+    - "envs/values.yaml"
+    - "envs/{{ .Environment.Name }}/values.yaml.gotmpl"
+
+repositories:
+  #- name: argo
+  #url: "https://argoproj.github.io/argo-helm"
+  #- name: grafana
+  #$url: "https://grafana.github.io/helm-charts"
+  #- name: jupyterhub
+  #url: "https://jupyterhub.github.io/helm-chart/"
+
+helmDefaults:
+  wait: true
+  timeout: 300
+  atomic: true
+  cleanupOnFail: false
+
+commonLabels:
+  apps: cg
+
+releases:
+- name: data-access-secrets
+  chart: charts/data-access-secrets
+  values:
+  - secrets: 
+{{ toYaml .Values.dataAccessSecrets | indent 6 }}
+- name: dcinside-crawler
+  chart: charts/dcinside-crawler
+  values:
+  - dataBroker:
+      bucket: "datalake-cg"
+      prefix: "json/dcinside/document/date=%F/hour=%H/"
+      nodeSelector:
+        cloud.google.com/gke-nodepool: default-pool
+    worker:
+      image: "gcr.io/"
+      nodeSelector:
+        cloud.google.com/gke-nodepool: pvm-g1-small-pool
+    liveDirectory:
+      image: "gcr.io/"
+      nodeSelector:
+        cloud.google.com/gke-nodepool: default-pool

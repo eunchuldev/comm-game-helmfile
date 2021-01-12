@@ -1,0 +1,14 @@
+worker:
+  replicas: 1
+  image: 
+  nodeSelector:
+    cloud.google.com/gke-nodepool: pvm-g1-small-pool
+liveDirectory:
+  image:
+  nodeSelector:
+    cloud.google.com/gke-nodepool: default-pool
+dataBroker:
+  bucket: 
+  prefix: "datalake/date=%F/hour=%H/"
+  nodeSelector:
+    cloud.google.com/gke-nodepool: default-pool

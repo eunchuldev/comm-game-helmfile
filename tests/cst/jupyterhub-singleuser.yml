@@ -1,0 +1,10 @@
+schemaVersion: 2.0.0
+commandTests:
+- name: "spark-env"
+  command: "bash"
+  args: ["-c", "source /opt/spark/conf/spark-env.sh && cat /opt/spark/conf/spark-defaults.conf"]
+  expectedOutput: ["spark.ui.proxyBase"]
+- name: "smae python version with spark"
+  command: "python"
+  args: ["--version"]
+  expectedOutput: ["3.7"]

@@ -1,0 +1,31 @@
+schemaVersion: 2.0.0
+fileExistenceTests:
+- name: 'spark-home'
+  path: '/opt/spark/'
+  shouldExist: true
+- name: 'python'
+  path: '/usr/local/bin/python'
+  shouldExist: true
+- name: 'spark-conf'
+  path: '/opt/spark/conf'
+  shouldExist: true
+  uid: 185
+  permissions: 'drwxr-xr-x'
+- name: 'spark-conf-default-overwritable'
+  path: '/opt/spark/conf/spark-defaults.conf'
+  shouldExist: true
+  uid: 185
+  permissions: '-rw-r--r--'
+commandTests:
+- name: "pyspark example"
+  command: "spark-submit"
+  args: ["--master=local", "/opt/spark/examples/src/main/python/pi.py", "10"]
+  expectedOutput: ["Pi is roughly 3"]
+- name: "mysql connection"
+  command: "/test"
+- name: "spark-env"
+  command: "bash"
+  args: ["-c", "source /opt/spark/conf/spark-env.sh && \
+                source /opt/spark/conf/spark-env.sh && \
+                cat /opt/spark/conf/spark-defaults.conf"]
+  expectedOutput: ["###_START_LINE_OF_DYNAMIC_CONFS_###"]

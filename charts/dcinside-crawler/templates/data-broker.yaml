@@ -1,0 +1,59 @@
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  labels:
+    app: dc-crawler-data-broker
+  name: dc-crawler-data-broker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dc-crawler-data-broker
+  template:
+    metadata:
+      labels:
+        app: dc-crawler-data-broker
+      annotations:
+        configHash: {{ include (print $.Template.BasePath "/data-broker-configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - env:
+            - name: "LOG"
+              value: "warn"
+            - name: "GOOGLE_APPLICATION_CREDENTIALS"
+              value: "/run/data-access/service-account/json"
+          image: "timberio/vector:0.11.X-alpine"
+          imagePullPolicy: "IfNotPresent"
+          name: "main"
+          ports:
+          - containerPort: 8080
+          volumeMounts:
+            - mountPath: "/etc/vector/"
+              name: dc-crawler-data-broker
+              readOnly: true
+            - mountPath: "/run/data-access/"
+              name: data-access
+      volumes:
+        - name: dc-crawler-data-broker 
+          configMap:
+            name: dc-crawler-data-broker
+        - name: data-access
+          secret:
+            secretName: data-access
+      nodeSelector:
+        {{ toYaml | .Values.dataBroker.nodeSelector | indent 8 }}
+
+---
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  labels:
+    app: dc-crawler-data-broker
+  name: dc-crawler-data-broker
+spec:
+  ports:
+    - port: 8080
+  selector:
+    app: dc-crawler-data-broker
+  type: "ClusterIP"

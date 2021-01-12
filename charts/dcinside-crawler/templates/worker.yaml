@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dc-crawler-worker
+  labels:
+    app: dc-crawler-worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      app: dc-crawler-worker
+  template:
+    metadata:
+      labels:
+        app: dc-crawler-worker
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '8080'
+    spec:
+      containers:
+      - name: live-directory
+        image: {{ .Values.worker.image }}
+        env:
+        - name: LIVE_DIRECTORY_URL
+          value: "http://dc-crawler-live-dir:8080"
+        - name: TOTAL
+          value: {{ .Values.worker.replicas }}
+        - name: DATA_BROKER_URL
+          value: "http://dc-crawler-data-broker:8080"
+        command: ["sh", "-c", "PART=${HOSTNAME##*-} worker"]
+        ports:
+        - containerPort: 8080

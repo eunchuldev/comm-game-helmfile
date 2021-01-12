@@ -1,0 +1,9 @@
+schemaVersion: 2.0.0
+commandTests:
+- name: "rds-snapshot-export binary"
+  command: "/scripts/rds-snapshot-export/rds-snapshot-export"
+  expectedOutput: ["Usage: "]
+  exitCode: 2
+- name: "rds-snapshot-export tests"
+  command: "bash"
+  args: ['-c', "cd /scripts/rds-snapshot-export/ && shellspec"]

@@ -1,0 +1,67 @@
+# pvc-demo.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: da-crawler-live-dir
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dc-crawler-live-dir
+  labels:
+    app: dc-crawler-live-dir
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dc-crawler-live-dir
+  template:
+    metadata:
+      labels:
+        app: dc-crawler-live-dir
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '8080'
+    spec:
+      nodeSelector:
+        {{ toYaml | .Values.dataBroker.nodeSelector | indent 8 }}
+      volumes:
+      - name: db
+        persistentVolumeClaim:
+          claimName: da-crawler-live-dir
+      containers:
+      - name: live-dir
+        image: {{ .Values.liveDirectory.image }}
+        command: ["live-directory"]
+        env:
+        - name: PORT
+          value: "8080"
+        - name: STORE_PATH
+          value: "/db/store"
+        volumeMounts:
+        - mountPath: /db
+          name: db
+        ports:
+        - containerPort: 8080
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: dc-crawler-live-dir
+spec:
+  selector:
+    app: dc-crawler-live-dir
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
