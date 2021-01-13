@@ -4,8 +4,8 @@ use actix_web::client::{PayloadError, SendRequestError};
 
 #[derive(Error, Debug)]
 pub enum DocumentParseError {
-    #[error(display = "fail to select `{}`", path)]
-    Select { path: &'static str },
+    #[error(display = "fail to select `{}`: html: {}", path, html)]
+    Select { path: &'static str, html: String },
     #[error(display = "fail to parse `{}`", path)]
     NumberParse { path: &'static str },
     #[error(display = "fail to parse `{}`", path)]
@@ -32,29 +32,29 @@ pub enum CommentParseError {
 }
 #[derive(Error, Debug)]
 pub enum DocumentBodyParseError {
-    #[error(display = "fail to select `{}`", path)]
-    Select { path: &'static str },
-    #[error(display = "fail to parse page")]
+    #[error(display = "fail to select `{}`: html: {}", path, html)]
+    Select { path: &'static str, html: String },
+    #[error(display = "fail to parse page: {}", _0)]
     DocumentParseError(#[source] DocumentParseError),
 }
 
 #[derive(Error, Debug)]
 pub enum CrawlerError {
-    #[error(display = "actix client send")]
+    #[error(display = "actix client send: {}", _0)]
     SendRequest(#[source] SendRequestError),
-    #[error(display = "acitx client payload")]
+    #[error(display = "acitx client payload: {}", _0)]
     Payload(#[source] PayloadError),
-    #[error(display = "serde")]
+    #[error(display = "serde: {}", _0)]
     Serde(#[source] serde_json::Error),
-    #[error(display = "fmt")]
+    #[error(display = "fmt: {}", _0)]
     Fmt(#[source] core::fmt::Error),
-    #[error(display = "utf8")]
+    #[error(display = "utf8: {}", _0)]
     Utf8(#[source] std::str::Utf8Error),
-    #[error(display = "fail to parse root page")]
+    #[error(display = "fail to parse root page: {}", _0)]
     DocumentParseError(#[source] DocumentParseError),
-    #[error(display = "fail to parse comment")]
+    #[error(display = "fail to parse comment: {}", _0)]
     CommentParseError(#[source] CommentParseError),
-    #[error(display = "fail to parse body")]
+    #[error(display = "fail to parse body: {}", _0)]
     DocumentBodyParseError(#[source] DocumentBodyParseError),
 }
 

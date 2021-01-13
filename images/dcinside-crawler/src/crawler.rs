@@ -80,23 +80,22 @@ impl<'a> Crawler {
             jsonp_callback_func,
             Utc::now().timestamp_millis()
         );
-        let bytes = back_off(1000, 1000*60, || async {
-            Ok::<_, CrawlerError>(self
+        Ok(back_off(1000, 1000*10, || async {
+            let bytes = self
                 .client
                 .get(path.as_str())
                 .header("Referer", "https://gall.dcinside.com/")
                 .send().await?
-                .body().await?)
-        })
-        .await?;
-        let text = std::str::from_utf8(&bytes)?;
-        let trimed = text.trim();
-        let jsonp_contents = &trimed[jsonp_callback_func.len() + 1..trimed.len() - 1];
-        let mut galleries: Vec<GalleryIndex> = serde_json::from_str(&jsonp_contents)?;
-        for g in galleries.iter_mut() {
-            g.kind = GalleryKind::Major;
-        }
-        Ok(galleries)
+                .body().await?;
+            let text = std::str::from_utf8(&bytes)?;
+            let trimed = text.trim();
+            let jsonp_contents = &trimed[jsonp_callback_func.len() + 1..trimed.len() - 1];
+            let mut galleries: Vec<GalleryIndex> = serde_json::from_str(&jsonp_contents)?;
+            for g in galleries.iter_mut() {
+                g.kind = GalleryKind::Major;
+            }
+            Ok::<_, CrawlerError>(galleries)
+        }).await?)
     }
     pub async fn document_indexes_after(
         &mut self,
@@ -129,7 +128,7 @@ impl<'a> Crawler {
     ) -> Result<Vec<Comment>, CrawlerError> {
         let mut comms = Vec::new();
         for i in 1..1000 {
-            let (next_comms, max_page) = self._comments(&gallery, doc_id, i, None).await.unwrap();
+            let (next_comms, max_page) = self._comments(&gallery, doc_id, i, None).await?;
             if next_comms.is_empty() {
                 break;
             }
@@ -178,16 +177,16 @@ impl<'a> Crawler {
     ) -> Result<String, CrawlerError> {
         let path = format!("{}/board/view/?id={}&no={}&page=1", self.host, gallery.id, id);
         let referer = format!("{}/board/lists?id={}", self.host, gallery.id);
-        let bytes = back_off(1000, 1000*60, || async {
-            Ok::<_, CrawlerError>(self
+        Ok(back_off(1000, 1000*10, || async {
+            let bytes = self
                 .client
                 .get(path.as_str())
                 .header("Referer", referer.as_str())
                 .send().await?
-                .body().await?)
-        }).await?;
-        let text = std::str::from_utf8(&bytes)?;
-        Ok(parse_document_body(text, &gallery.id, id)?)
+                .body().await?;
+            let text = std::str::from_utf8(&bytes)?;
+            Ok::<_, CrawlerError>(parse_document_body(text, &gallery.id, id)?)
+        }).await?)
     }
     pub async fn documents_after(
         &mut self,
@@ -241,8 +240,8 @@ impl<'a> Crawler {
             prevCnt: 0,
             _GALLTYPE_: "G",
         };
-        let bytes = back_off(1000, 1000*60, || async {
-            Ok::<_, CrawlerError>(self
+        Ok(back_off(1000, 1000*10, || async {
+            let bytes = self
                .client
                .post(path.as_str())
                .header("Accept", "application/json, text/javascript, */*; q=0.01")
@@ -255,10 +254,10 @@ impl<'a> Crawler {
                .header("Cache-Control", "no-cache")
                .header("Pragma", "no-cache")
                .send_form(&form).await?
-               .body().await?)
-        }).await?;
-        let text = std::str::from_utf8(&bytes)?;
-        Ok(parse_comments(text, &gallery.id, doc_id, last_root_comment_id)?)
+               .body().await?;
+            let text = std::str::from_utf8(&bytes)?;
+            Ok::<_, CrawlerError>(parse_comments(text, &gallery.id, doc_id, last_root_comment_id)?)
+        }).await?)
     }
     pub async fn document_indexes(
         &mut self,
@@ -276,21 +275,24 @@ impl<'a> Crawler {
             ),
             _ => panic!("What's this?"),
         };
-        let bytes = back_off(1000, 1000*60, || async {
-            Ok::<_, CrawlerError>(self
+        let (e_s_n_o, res) = back_off(1000, 1000*10, || async {
+            let bytes = self
                 .client
                 .get(path.as_str())
                 .header("Referer", "https://gall.dcinside.com/")
                 .send().await?
-                .body().await?)
+                .body().await?;
+            let text = std::str::from_utf8(&bytes)?;
+            let e_s_n_o = Some(HTMLDocument::from(text)
+                .select(Attr("id", "e_s_n_o"))
+                .next()
+                .ok_or(DocumentParseError::Select { path: ".e_s_n_o", html: text.to_string() })?
+                .attr("value")
+                .ok_or(DocumentParseError::Select { path: ".e_s_n_o@value", html: text.to_string() })?.to_string());
+            Ok::<_, CrawlerError>((e_s_n_o, parse_document_indexes(text, &gallery.id)?))
         }).await?;
-        let text = std::str::from_utf8(&bytes)?;
-        self.e_s_n_o = Some(HTMLDocument::from(text)
-            .select(Attr("id", "e_s_n_o"))
-            .next()
-            .ok_or(DocumentParseError::Select { path: ".e_s_n_o" })?
-            .attr("value")
-            .ok_or(DocumentParseError::Select { path: ".e_s_n_o@value" })?.to_string());
+        self.e_s_n_o = e_s_n_o;
+        Ok(res)
         /*parse_document_indexes(text)
         .map_err(|e| CrawlerError::DocumentParseError{
             source: e,
@@ -302,7 +304,6 @@ impl<'a> Crawler {
             gallery: gallery.id.clone(),
             page: page,
         })*/
-        Ok(parse_document_indexes(text, &gallery.id)?)
         /*Ok(parse_document_indexes(text, &gallery.id)
             .map_err(|e| CrawlerError::DocumentParseError {
                 source: e,

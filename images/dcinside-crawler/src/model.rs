@@ -161,7 +161,7 @@ pub fn parse_document_body(
 ) -> Result<String, DocumentBodyParseError> {
     let doc = HTMLDocument::from(body);
     Ok(doc
-        .select(Class("write_div")).next().ok_or(DocumentParseError::Select { path: ".write_div" })?.inner_html())
+        .select(Class("write_div")).next().ok_or(DocumentParseError::Select { path: ".write_div", html: body.to_string() })?.inner_html())
         //.next().ok_or(DocumentParseError::Select { path: ".write_div" })?
         //.text().trim().to_string())
 }
@@ -177,19 +177,19 @@ pub fn parse_document_indexes(
         .map(|node| -> Result<_, DocumentParseError> {
             let id = node
                 .select(Class("gall_num"))
-                .next().ok_or(DocumentParseError::Select { path: ".us-post .gall_num", })?
+                .next().ok_or(DocumentParseError::Select { path: ".us-post .gall_num", html: body.to_string() })?
                 .text().parse().map_err(|_| DocumentParseError::NumberParse { path: ".us-post .gall_num", })?;
             let title = node
                 .select(Class("gall_tit").descendant(Name("a")))
-                .next().ok_or(DocumentParseError::Select { path: ".us-post .gall_tit", })?
+                .next().ok_or(DocumentParseError::Select { path: ".us-post .gall_tit", html: body.to_string() })?
                 .text();
             let subject = node.select(Class("gall_subject")).next().map(|n| n.text());
             let author = {
                 let writer_node =
                     node.select(Class("gall_writer"))
-                        .next().ok_or(DocumentParseError::Select { path: ".us-post .gall_writer", })?;
+                        .next().ok_or(DocumentParseError::Select { path: ".us-post .gall_writer", html: body.to_string() })?;
                 let nickname = writer_node
-                    .attr("data-nick").ok_or(DocumentParseError::Select { path: ".us-post .gall_writer@data-nick", })?;
+                    .attr("data-nick").ok_or(DocumentParseError::Select { path: ".us-post .gall_writer@data-nick", html: body.to_string() })?;
                 let ip = writer_node.attr("data-ip");
                 let id = writer_node.attr("data-uid");
                 match (id, ip) {
@@ -197,7 +197,7 @@ pub fn parse_document_indexes(
                     (Some(id), Some(ip)) if ip.is_empty() => Ok(User::Static { id: id.into(), nickname: nickname.into(), }),
                     (None, Some(ip)) => Ok(User::Dynamic { ip: ip.into(), nickname: nickname.into(), }),
                     (Some(id), Some(ip)) if id.is_empty() => Ok(User::Dynamic { ip: ip.into(), nickname: nickname.into(), }),
-                    _ => Err(DocumentParseError::Select { path: ".us-post .gall_writer@(data-ip | data-id)", }),
+                    _ => Err(DocumentParseError::Select { path: ".us-post .gall_writer@(data-ip | data-id)", html: body.to_string() }),
                 }?
             };
             let comment_count = node
@@ -207,15 +207,15 @@ pub fn parse_document_indexes(
                 .unwrap_or(0);
             let like_count = node
                 .select(Class("gall_recommend"))
-                .next().ok_or(DocumentParseError::Select { path: ".us-post .gall_recommned", })?
+                .next().ok_or(DocumentParseError::Select { path: ".us-post .gall_recommned", html: body.to_string() })?
                 .text().parse().map_err(|_| DocumentParseError::NumberParse { path: ".us-post .gall_recommend", })?;
             let view_count = node
                 .select(Class("gall_count"))
                 .next()
-                .ok_or(DocumentParseError::Select { path: ".us-post .gall_count", })?
+                .ok_or(DocumentParseError::Select { path: ".us-post .gall_count", html: body.to_string() })?
                 .text()
                 .parse()
-                .map_err(|_| DocumentParseError::NumberParse { path: ".us-post .gall_count", })?;
+                .map_err(|_| DocumentParseError::NumberParse { path: ".us-post .gall_count" })?;
             let has_picture = node
                 .select(Class("icon_pic"))
                 .next().map(|_| true).unwrap_or(false);
@@ -232,8 +232,8 @@ pub fn parse_document_indexes(
                 .next().map(|_| true).unwrap_or(false);
             let created_at_text = node
                 .select(Class("gall_date"))
-                .next().ok_or(DocumentParseError::Select { path: ".us-post .gall_date", })?
-                .attr("title").ok_or(DocumentParseError::Select { path: ".us-post .gall_date@title", })?;
+                .next().ok_or(DocumentParseError::Select { path: ".us-post .gall_date", html: body.to_string() })?
+                .attr("title").ok_or(DocumentParseError::Select { path: ".us-post .gall_date@title", html: body.to_string() })?;
             let created_at_without_tz =
                 NaiveDateTime::parse_from_str(created_at_text.trim(), "%Y-%m-%d %H:%M:%S")
                     .map_err(|_| DocumentParseError::DatetimeParse { path: ".us-post .gall_date@title", })?;
