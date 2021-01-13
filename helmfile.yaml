@@ -19,6 +19,8 @@ helmDefaults:
   timeout: 60
   atomic: true
   cleanupOnFail: false
+  kubeContext: {{ requiredEnv "KUBE_CONTEXT" }}
+
 
 commonLabels:
   apps: cg
@@ -38,10 +40,10 @@ releases:
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool
     worker:
-      image: "gcr.io/community-gamification-283222/dcinside-crawler:e518d70"
+      image: "gcr.io/community-gamification-283222/dcinside-crawler:5770c0e"
       nodeSelector:
         cloud.google.com/gke-nodepool: pvm-g1-small-pool
     liveDirectory:
-      image: "gcr.io/community-gamification-283222/dcinside-crawler:e518d70"
+      image: "gcr.io/community-gamification-283222/dcinside-crawler:5770c0e"
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool
