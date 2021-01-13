@@ -30,6 +30,13 @@ pub enum CommentParseError {
         gallery_id: String,
     },
 }
+#[derive(Error, Debug)]
+pub enum DocumentBodyParseError {
+    #[error(display = "fail to select `{}`", path)]
+    Select { path: &'static str },
+    #[error(display = "fail to parse page")]
+    DocumentParseError(#[source] DocumentParseError),
+}
 
 #[derive(Error, Debug)]
 pub enum CrawlerError {
@@ -45,8 +52,10 @@ pub enum CrawlerError {
     Utf8(#[source] std::str::Utf8Error),
     #[error(display = "fail to parse root page")]
     DocumentParseError(#[source] DocumentParseError),
-    #[error(display = "fail to parse root page")]
+    #[error(display = "fail to parse comment")]
     CommentParseError(#[source] CommentParseError),
+    #[error(display = "fail to parse body")]
+    DocumentBodyParseError(#[source] DocumentBodyParseError),
 }
 
 #[derive(Error, Debug)]

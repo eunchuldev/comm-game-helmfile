@@ -149,22 +149,45 @@ impl<'a> Crawler {
     ) -> Result<Vec<Result<Document, CrawlerError>>, CrawlerError> {
         let mut documents = Vec::new();
         for res in self.document_indexes(&gallery, page).await? {
-            match res {
+            let doc: Result<Document, CrawlerError> = match res {
                 Ok(index) => {
                     let id = index.id;
-                    if index.comment_count > 0 {
-                        match self.comments(&gallery, id).await {
-                            Ok(comms) => documents.push(Ok(Document { index: index, comments: comms })),
-                            Err(err) => documents.push(Err(err.into())),
-                        };
-                    } else {
-                        documents.push(Ok(Document { index: index, comments: Vec::new() }));
+                    let comments = if index.comment_count > 0 {
+                        Some(self.comments(&gallery, id).await)
+                    } else { 
+                        None
+                    };
+                    let body = self.document_body(&gallery, id).await;
+                    match (comments, body) {
+                        (Some(Ok(comms)), Ok(body)) => Ok(Document { index: index, comments: Some(comms), body: Some(body) }),
+                        (None, Ok(body)) => Ok(Document { index: index, comments: None, body: Some(body) }),
+                        (Some(Err(err)), _) => Err(err.into()),
+                        (_, Err(err)) => Err(err.into()),
                     }
                 },
-                Err(err) => documents.push(Err(err.into())),
+                Err(err) => Err(err.into()),
             };
+            documents.push(doc);
         }
         Ok(documents)
+    }
+    pub async fn document_body(
+        &mut self,
+        gallery: &GalleryIndex,
+        id: usize
+    ) -> Result<String, CrawlerError> {
+        let path = format!("{}/board/view/?id={}&no={}&page=1", self.host, gallery.id, id);
+        let referer = format!("{}/board/lists?id={}", self.host, gallery.id);
+        let bytes = back_off(1000, 1000*60, || async {
+            Ok::<_, CrawlerError>(self
+                .client
+                .get(path.as_str())
+                .header("Referer", referer.as_str())
+                .send().await?
+                .body().await?)
+        }).await?;
+        let text = std::str::from_utf8(&bytes)?;
+        Ok(parse_document_body(text, &gallery.id, id)?)
     }
     pub async fn documents_after(
         &mut self,
@@ -174,20 +197,25 @@ impl<'a> Crawler {
     ) -> Result<Vec<Result<Document, CrawlerError>>, CrawlerError> {
         let mut documents = Vec::new();
         for res in self.document_indexes_after(&gallery, last_document_id, start_page).await? {
-            match res {
+            let doc: Result<Document, CrawlerError> = match res {
                 Ok(index) => {
                     let id = index.id;
-                    if index.comment_count > 0 {
-                        match self.comments(&gallery, id).await {
-                            Ok(comms) => documents.push(Ok(Document { index: index, comments: comms })),
-                            Err(err) => documents.push(Err(err.into())),
-                        };
-                    } else {
-                        documents.push(Ok(Document { index: index, comments: Vec::new() }));
+                    let comments = if index.comment_count > 0 {
+                        Some(self.comments(&gallery, id).await)
+                    } else { 
+                        None
+                    };
+                    let body = self.document_body(&gallery, id).await;
+                    match (comments, body) {
+                        (Some(Ok(comms)), Ok(body)) => Ok(Document { index: index, comments: Some(comms), body: Some(body) }),
+                        (None, Ok(body)) => Ok(Document { index: index, comments: None, body: Some(body) }),
+                        (Some(Err(err)), _) => Err(err.into()),
+                        (_, Err(err)) => Err(err.into()),
                     }
                 },
-                Err(err) => documents.push(Err(err.into())),
+                Err(err) => Err(err.into()),
             };
+            documents.push(doc);
         }
         Ok(documents)
     }

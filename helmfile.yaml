@@ -38,7 +38,7 @@ releases:
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool
     worker:
-      image: "gcr.io/community-gamification-283222/dcinside-crawler:ae5a876"
+      image: "gcr.io/community-gamification-283222/dcinside-crawler:c4d3432"
       nodeSelector:
         cloud.google.com/gke-nodepool: pvm-g1-small-pool
     liveDirectory:

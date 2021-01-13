@@ -46,7 +46,8 @@ pub struct DocumentIndex {
 pub struct Document {
     #[serde(flatten)]
     pub index: DocumentIndex,
-    pub comments: Vec<Comment>,
+    pub comments: Option<Vec<Comment>>,
+    pub body: Option<String>,
 }
 
 pub fn skip_empty_str<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -153,6 +154,17 @@ pub struct Comment {
 }
 
 
+pub fn parse_document_body(
+    body: &str,
+    gallery_id: &str,
+    document_id: usize,
+) -> Result<String, DocumentBodyParseError> {
+    let doc = HTMLDocument::from(body);
+    Ok(doc
+        .select(Class("write_div")).next().ok_or(DocumentParseError::Select { path: ".write_div" })?.inner_html())
+        //.next().ok_or(DocumentParseError::Select { path: ".write_div" })?
+        //.text().trim().to_string())
+}
 
 
 pub fn parse_document_indexes(
@@ -321,5 +333,10 @@ mod tests {
             User::Dynamic { ip, .. } => ip.is_empty(),
             User::Unknown { .. }=> { false }
         }));
+    }
+    #[test]
+    fn it_parses_document_body() {
+        let res = parse_document_body(include_str!("../assets/body.html"), "gallery_id", 1).unwrap();
+        assert_eq!(res, "\n\t\t\t\t\t\t\t<p>\'올림픽\' 개최 위해 백신팀 극비리 가동<br><br>전국민 맞고 남을 만큼 확보했지만<br><br>\'국내 1~3차 임상 필수\' 규제에 발목<br><br>\"국산 백신은 왜 없나\" 비판도 일어<br><br>백신을 빨리 확보했음에도, 정작 접종시기는 2월말 - 한국과 차이 X<br><br>일본은 국내 임상 1,2,3차를 거쳐야 하는데, 모더나는 1월경 임상시험에 들어간다고 발표, 그러나 언제 접종할 지에 대해선 타임라인 제시 X</p><p><br></p><p><br></p><p style=\"text-align:left;\"><img src=\"https://dcimg8.dcinside.co.kr/viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a8551648461846084596f34596bb9e7a7968b67c\" style=\"cursor:pointer;\" onclick=\"javascript:imgPop(\'https://image.dcinside.com/viewimagePop.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364ad33fbacc76da4d6aa29c4891b49fe3513541273923ef18\',\'image\',\'fullscreen=yes,scrollbars=yes,resizable=no,menubar=no,toolbar=no,location=no,status=no\');\" alt=\"viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a8551648461846084596f34596bb9e7a7968b67c\"></p><p style=\"text-align:left;\">18시 현재 6,055명 (도쿄 1,494명 )<br><br>일요일 기준 최고치 갱신 중<br></p><p><br></p><p style=\"text-align:left;\"><img src=\"https://dcimg8.dcinside.co.kr/viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a85516484618460810c0a219c177961ee0f408ae\" style=\"cursor:pointer;\" onclick=\"javascript:imgPop(\'https://image.dcinside.com/viewimagePop.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364ad33fbacc76da4d6aa29c48c4e2cebf0663432839231131\',\'image\',\'fullscreen=yes,scrollbars=yes,resizable=no,menubar=no,toolbar=no,location=no,status=no\');\" alt=\"viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a85516484618460810c0a219c177961ee0f408ae\"></p><p><br></p>\t\t\t\t\t\t\t\t".to_string());
     }
 }
