@@ -87,11 +87,17 @@ impl State {
         Ok(())
     }
     async fn run(&mut self) -> Result<ResultMetric, WorkerError> {
-        let gallery_states = self.fetch_gallery_list().await?;
+        let mut gallery_states = self.fetch_gallery_list().await?;
         let mut metric = ResultMetric::default();
         let len = gallery_states.len();
+        gallery_states.sort_by(|a, b| match (a.last_crawled_at, b.last_crawled_at) {
+            (Some(a), Some(b)) => a.cmp(&b),
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        });
         for (i, gallery_state) in gallery_states.into_iter().enumerate() {
-            info!("{}/{} start", i, len);
+            info!("{}/{} start | {}(last crawled at {:?})", i, len, gallery_state.index.id, gallery_state.last_crawled_at);
             let now = chrono::Utc::now();
             let res = if let Some(last_crawled_document_id) = gallery_state.last_crawled_document_id {
                 self.crawler.documents_after(&gallery_state.index, last_crawled_document_id, self.start_page).await
@@ -100,6 +106,7 @@ impl State {
             };
             match &res {
                 Ok(res) => {
+                    info!("crawled documents: {}", res.len());
                     metric.gallery_success += 1;
                     let mut last_document_id = 0usize;
                     for r in res {
@@ -128,17 +135,13 @@ impl State {
                             }
                         };
                     }
-                    if last_document_id > 0usize {
-                        if let Err(e) = self.report(GalleryCrawlReportForm {
-                            id: gallery_state.index.id.clone(),
-                            last_crawled_at: Some(now),
-                            last_crawled_document_id: Some(last_document_id),
-                        }).await {
-                            error!("error while report: {}", e.to_string());
-                        };
-                    } else {
-                        error!("no document of {}", &gallery_state.index.id);
-                    }
+                    if let Err(e) = self.report(GalleryCrawlReportForm {
+                        id: gallery_state.index.id.clone(),
+                        last_crawled_at: Some(now),
+                        last_crawled_document_id: Some(last_document_id),
+                    }).await {
+                        error!("error while report: {}", e.to_string());
+                    };
                 }
                 Err(err) => {
                     error!("get index of {} fail: {}", &gallery_state.index.id, err.to_string());
