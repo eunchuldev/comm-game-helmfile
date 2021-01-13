@@ -30,6 +30,8 @@ pub enum WorkerError {
     Payload(#[source] PayloadError),
     #[error(display = "serde")]
     Serde(#[source] serde_json::Error),
+    #[error(display = "err http response: {}", _0)]
+    Response(StatusCode),
 }
 
 #[derive(Serialize)]
@@ -79,12 +81,20 @@ impl State {
         Ok(serde_json::from_slice(&bytes)?)
     }
     async fn report(&self, form: GalleryCrawlReportForm) -> Result<(), WorkerError> {
-        self.crawler.client.post(format!("{}/list", self.live_directory_url)).send_json(&form).await?.body().await?;
-        Ok(())
+        let res = self.crawler.client.post(format!("{}/report", self.live_directory_url)).send_json(&form).await?;
+        if res.status() == StatusCode::OK {
+            Ok(())
+        } else {
+            Err(WorkerError::Response(res.status()))
+        }
     }
     async fn send_data(&self, data: &Document) -> Result<(), WorkerError> {
-        self.crawler.client.post(&self.data_broker_url).send_json(data).await?.body().await?;
-        Ok(())
+        let res = self.crawler.client.post(&self.data_broker_url).send_json(data).await?;
+        if res.status() == StatusCode::OK {
+            Ok(())
+        } else {
+            Err(WorkerError::Response(res.status()))
+        }
     }
     async fn run(&mut self) -> Result<ResultMetric, WorkerError> {
         let mut gallery_states = self.fetch_gallery_list().await?;
