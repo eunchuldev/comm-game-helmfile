@@ -7,6 +7,8 @@ environments:
     - "envs/{{ .Environment.Name }}/values.yaml.gotmpl"
 
 repositories:
+- name: argo
+  url: "https://argoproj.github.io/argo-helm"
   #- name: argo
   #url: "https://argoproj.github.io/argo-helm"
   #- name: grafana
@@ -21,7 +23,6 @@ helmDefaults:
   cleanupOnFail: false
   kubeContext: {{ requiredEnv "KUBE_CONTEXT" }}
 
-
 commonLabels:
   apps: cg
 
@@ -35,15 +36,48 @@ releases:
   chart: charts/dcinside-crawler
   values:
   - dataBroker:
-      bucket: "datalake-cg"
-      prefix: "json/dcinside/document/date=%F/hour=%H/"
+      bucket: datalake-cg
+      prefix: json/dcinside/document/date=%F/hour=%H/
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool
     worker:
-      image: "gcr.io/community-gamification-283222/dcinside-crawler:182d453"
+      image: gcr.io/community-gamification-283222/dcinside-crawler:6040974
       nodeSelector:
-        cloud.google.com/gke-nodepool: pvm-g1-small-pool
+        cloud.google.com/gke-nodepool: pvm-e2-micro-pool
     liveDirectory:
-      image: "gcr.io/community-gamification-283222/dcinside-crawler:182d453"
+      image: gcr.io/community-gamification-283222/dcinside-crawler:6040974
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool
+- name: argo
+  namespace: argo
+  chart: argo/argo
+  version: 0.14.0
+  needs: [ argo/argo-suppliment ]
+  values:
+  - singleNamespace: true
+  - useDefaultArtifactRepo: true
+  - artifactRepository:
+      archiveLogs: true
+      gcs:
+        bucket: datalake-cg
+        keyFormat: argo/artifacts/
+        serviceAccountKeySecret:
+          name: data-access
+          key: "service-account.json"
+  - controller:
+      workflowDefaults:
+        metadata:
+          namespace: argo
+        spec:
+          volumes:
+          - name: 'data-access-secrets'
+            secret: 
+              secretName: 'data-access'
+              defaultMode: 256
+      nodeSelector:
+        cloud.google.com/gke-nodepool: default-pool
+- name: argo-suppliment
+  namespace: argo
+  chart: charts/argo-suppliment
+  values:
+  - serviceAccountName: default

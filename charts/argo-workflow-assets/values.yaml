@@ -1,0 +1,6 @@
+spark:
+  executor:
+    nodeSelector:
+imagePullPolicy: Always
+images: {}
+bucket: 

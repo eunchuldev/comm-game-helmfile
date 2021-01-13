@@ -1,0 +1,3 @@
+apiVersion: v2
+name: argo-workflow-assets
+version: 0.1.0

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-spark
+spec:
+  volumes:
+    - name: data-access-secrets
+      secret:
+        secretName: data-access
+        defaultMode: 256
+  containers:
+    - name: spark
+      image: gcr.io/community-gamification-283222/spark:6040974
+      command: ["bash", "-c", "while true; do foo; sleep 10; done"]
+      env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /run/data-access/service-account.json
+      volumeMounts:
+        - name: data-access-secrets
+          mountPath: /run/data-access

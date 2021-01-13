@@ -8,6 +8,7 @@ data:
     compression = "gzip"
     encoding.codec = "ndjson"
     key_prefix = {{ .Values.dataBroker.prefix | quote }}
+    metadata = { Content-Encoding = "" }
 
     [sources.logs]
     address = "0.0.0.0:8080"
