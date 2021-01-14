@@ -15,6 +15,6 @@ spec:
         arguments:
           parameters:
           - name: jsonPath
-            value: jsonPath
+            value: "gs://datalake-cg/json/dcinside/document/date=2021-01-14/"
           - name: parquetPath
-            value: parquetPath
+            value: "gs://datalake-cg/parquet/dcinside/document/date=2021-01-14/"

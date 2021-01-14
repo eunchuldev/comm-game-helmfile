@@ -77,7 +77,7 @@ impl State {
     }
     fn start_page(mut self, v: usize) -> Self { self.start_page = v; self }
     async fn fetch_gallery_list(&self) -> Result<Vec<GalleryState>, WorkerError> {
-        let bytes = self.crawler.client.get(format!("{}/list", self.live_directory_url)).query(&ListPartQuery{ total: self.total, part: self.part }).unwrap().send().await?.body().await?;
+        let bytes = self.crawler.client.get(format!("{}/list", self.live_directory_url)).query(&ListPartQuery{ total: self.total, part: self.part }).unwrap().send().await?.body().limit(1024*1024*8).await?;
         Ok(serde_json::from_slice(&bytes)?)
     }
     async fn report(&self, form: GalleryCrawlReportForm) -> Result<(), WorkerError> {

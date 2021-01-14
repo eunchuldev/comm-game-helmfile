@@ -46,7 +46,7 @@ do
 done
 
 echo "The updated repositories:"
-echo "$url"
+echo "$url:$TAG"
 
 echo ""
 if [ -n "$url" ] && [ -n "$TAG" ]; then

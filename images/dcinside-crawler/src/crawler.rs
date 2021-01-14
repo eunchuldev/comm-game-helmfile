@@ -86,7 +86,7 @@ impl<'a> Crawler {
                 .get(path.as_str())
                 .header("Referer", "https://gall.dcinside.com/")
                 .send().await?
-                .body().await?;
+                .body().limit(1024*1024*8).await?;
             let text = std::str::from_utf8(&bytes)?;
             let trimed = text.trim();
             let jsonp_contents = &trimed[jsonp_callback_func.len() + 1..trimed.len() - 1];
@@ -186,7 +186,7 @@ impl<'a> Crawler {
                 .get(path.as_str())
                 .header("Referer", referer.as_str())
                 .send().await?
-                .body().await?;
+                .body().limit(1024*1024*8).await?;
             let text = std::str::from_utf8(&bytes)?;
             Ok::<_, CrawlerError>(parse_document_body(text, &gallery.id, id)?)
         }).await?)
@@ -260,7 +260,7 @@ impl<'a> Crawler {
                .header("Cache-Control", "no-cache")
                .header("Pragma", "no-cache")
                .send_form(&form).await?
-               .body().await?;
+               .body().limit(1024*1024*8).await?;
             let text = std::str::from_utf8(&bytes)?;
             Ok::<_, CrawlerError>(parse_comments(text, &gallery.id, doc_id, last_root_comment_id)?)
         }).await?)
@@ -287,7 +287,7 @@ impl<'a> Crawler {
                 .get(path.as_str())
                 .header("Referer", "https://gall.dcinside.com/")
                 .send().await?
-                .body().await?;
+                .body().limit(1024*1024*8).await?;
             let text = std::str::from_utf8(&bytes)?;
             let e_s_n_o = Some(HTMLDocument::from(text)
                 .select(Attr("id", "e_s_n_o"))

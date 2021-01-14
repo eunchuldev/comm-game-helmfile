@@ -14,6 +14,8 @@ spec:
         secret:
           secretName: data-access
           defaultMode: 256
+      nodeSelector:
+        cloud.google.com/gke-nodepool: pvm-e2-medium-pool
       script:
         volumeMounts:
         - name: data-access-secrets
@@ -25,7 +27,9 @@ spec:
           value: {{ index .Values.images "spark" }}
         image: {{ index .Values.images "spark" }}
         imagePullPolicy: IfNotPresent
-        command: [bash]
+        command: [python]
         source: |
-          echo {{`{{inputs.parameters.jsonPath}}` | quote }}
-          echo {{`{{inputs.parameters.parquetPath}}` | quote }}
+          from pyspark.sql import SparkSession
+          spark = (SparkSession.builder.master("local").getOrCreate())
+          df = spark.read.format("json").load(path = "{{`{{inputs.parameters.jsonPath}}`}}")
+          df.coalesce(1).write.format("parquet").mode("overwrite").save(path = "{{`{{inputs.parameters.parquetPath}}`}}")

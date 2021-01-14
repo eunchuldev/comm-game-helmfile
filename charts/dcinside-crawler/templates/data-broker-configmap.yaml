@@ -7,14 +7,15 @@ data:
     bucket = {{ .Values.dataBroker.bucket | quote }}
     compression = "gzip"
     encoding.codec = "ndjson"
-    key_prefix = {{ printf "%s/%s" (trimSuffix "/" .Values.dataBroker.prefix) "date={{`{{ date }}`}}/hour={{`{{ hour }}`}}/" | quote }}
+    key_prefix = {{ printf "%s/%s" (trimSuffix "/" .Values.dataBroker.prefix) "date={{ date }}/hour={{ hour }}/" | quote }}
     metadata = { Content-Encoding = "" }
 
     [transforms.dc_doc_partitioned]
     inputs = ["dc_doc"]
     type = "regex_parser"
-    field = "message"
-    regex = '^(?P<date>[\d]{4}-[\d]{2}-[\d]{2})T(?P<hour>[\d]{2})'
+    field = "created_at"
+    drop_field = false
+    patterns = ['^(?P<date>[\d]{4}-[\d]{2}-[\d]{2})T(?P<hour>[\d]{2})']
 
     [sources.dc_doc]
     address = "0.0.0.0:8080"
