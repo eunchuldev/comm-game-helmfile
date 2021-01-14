@@ -34,7 +34,7 @@ spec:
         prometheus.io/port: '8080'
     spec:
       nodeSelector:
-        {{ toYaml .Values.dataBroker.nodeSelector | indent 8 }}
+{{ toYaml .Values.dataBroker.nodeSelector | indent 8 }}
       volumes:
       - name: db
         persistentVolumeClaim:
@@ -55,6 +55,11 @@ spec:
           name: db
         ports:
         - containerPort: 8080
+        {{- if .Values.liveDirectory.resources }}
+        resources:
+{{ toYaml .Values.liveDirectory.resources | indent 10 }}
+        {{- end }}
+        
 
 ---
 

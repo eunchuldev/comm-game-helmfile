@@ -1,0 +1,5 @@
+py4j
+pandas
+nbgitpuller
+jupyter-server-proxy
+

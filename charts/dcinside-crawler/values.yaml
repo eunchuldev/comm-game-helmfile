@@ -3,12 +3,15 @@ worker:
   image: 
   nodeSelector:
     cloud.google.com/gke-nodepool: pvm-g1-small-pool
+  resources: {}
 liveDirectory:
   image:
   nodeSelector:
     cloud.google.com/gke-nodepool: default-pool
+  resources: {}
 dataBroker:
   bucket: 
   prefix: "datalake/"
   nodeSelector:
     cloud.google.com/gke-nodepool: default-pool
+  resources: {}

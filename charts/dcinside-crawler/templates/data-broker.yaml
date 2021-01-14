@@ -17,22 +17,26 @@ spec:
         configHash: {{ include (print $.Template.BasePath "/data-broker-configmap.yaml") . | sha256sum }}
     spec:
       containers:
-        - env:
-            - name: "LOG"
-              value: "warn"
-            - name: "GOOGLE_APPLICATION_CREDENTIALS"
-              value: "/run/data-access/service-account.json"
-          image: "timberio/vector:0.11.X-alpine"
-          imagePullPolicy: "IfNotPresent"
-          name: "main"
-          ports:
-          - containerPort: 8080
-          volumeMounts:
-            - mountPath: "/etc/vector/"
-              name: dc-crawler-data-broker
-              readOnly: true
-            - mountPath: "/run/data-access/"
-              name: data-access
+      - name: "main"
+        env:
+          - name: "LOG"
+            value: "warn"
+          - name: "GOOGLE_APPLICATION_CREDENTIALS"
+            value: "/run/data-access/service-account.json"
+        image: "timberio/vector:0.11.X-alpine"
+        imagePullPolicy: "IfNotPresent"
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+          - mountPath: "/etc/vector/"
+            name: dc-crawler-data-broker
+            readOnly: true
+          - mountPath: "/run/data-access/"
+            name: data-access
+        {{- if .Values.dataBroker.resources }}
+        resources:
+{{ toYaml .Values.dataBroker.resources | indent 10 }}
+        {{- end }}
       volumes:
         - name: dc-crawler-data-broker 
           configMap:
@@ -41,7 +45,7 @@ spec:
           secret:
             secretName: data-access
       nodeSelector:
-        {{ toYaml .Values.dataBroker.nodeSelector | indent 8 }}
+{{ toYaml .Values.dataBroker.nodeSelector | indent 8 }}
 
 ---
 

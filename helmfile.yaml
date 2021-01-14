@@ -10,6 +10,9 @@ environments:
 repositories:
 - name: argo
   url: "https://argoproj.github.io/argo-helm"
+- name: jupyterhub
+  url: "https://jupyterhub.github.io/helm-chart/"
+
   #- name: argo
   #url: "https://argoproj.github.io/argo-helm"
   #- name: grafana
@@ -41,15 +44,27 @@ releases:
       prefix: datalake/json/dcinside/document/
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool
+      resources:
+        requests:
+          memory: "100Mi"
+          cpu: "50m"
     worker:
       image: {{ index .Values.images "dcinside-crawler" }}
-      replicas: 2
+      replicas: 8
       nodeSelector:
         cloud.google.com/gke-nodepool: pvm-e2-micro-pool
+      resources:
+        requests:
+          memory: "10Mi"
+          cpu: "50m"
     liveDirectory:
       image: {{ index .Values.images "dcinside-crawler" }}
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool
+      resources:
+        requests:
+          memory: "100Mi"
+          cpu: "20m"
 - name: argo
   chart: argo/argo
   version: 0.14.0
@@ -80,8 +95,27 @@ releases:
   chart: charts/argo-suppliment
   values:
   - serviceAccountName: argo-workflow
-- name: argo-workflow-assets
-  chart: charts/argo-workflow-assets
+- name: jupyterhub
+  chart: 
+- name: etl
+  chart: charts/etl
   values:
   - images:
 {{ toYaml .Values.images | indent 6 }}
+- name: jupyterhub
+  chart: jupyterhub/jupyterhub
+  version: 0.10.6
+  values:
+  - dummy:
+    {{- if .Values.jupyterhub.ingress.host }}
+    ingress:
+      enabled: true
+      hosts: [ {{ .Values.jupyterhub.ingress.host }} ]
+      pathSuffix: "*"
+      annotations:
+        kubernetes.io/ingress.class: alb
+        alb.ingress.kubernetes.io/group.name: sa-kube-default-ingress
+        alb.ingress.kubernetes.io/scheme: internet-facing
+        alb.ingress.kubernetes.io/healthcheck-path: "/health"
+    {{- end }}
+{{ toYaml (omit .Values.jupyterhub "ingress" ) | indent 4 }}

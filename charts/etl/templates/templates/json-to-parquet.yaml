@@ -29,7 +29,11 @@ spec:
         imagePullPolicy: IfNotPresent
         command: [python]
         source: |
-          from pyspark.sql import SparkSession
+          from pyspark.sql import SparkSession, types as T, functions as F, Row
           spark = (SparkSession.builder.master("local").getOrCreate())
           df = spark.read.format("json").load(path = "{{`{{inputs.parameters.jsonPath}}`}}")
+          df = (df
+            .withColumn("created_at", F.to_timestamp(df.created_at))
+            .withColumn("comments.created_at", F.to_timestamp(df.created_at))
+            .withColumn("date", ""))
           df.coalesce(1).write.format("parquet").mode("overwrite").save(path = "{{`{{inputs.parameters.parquetPath}}`}}")

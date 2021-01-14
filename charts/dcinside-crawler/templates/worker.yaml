@@ -33,8 +33,12 @@ spec:
         command: ["sh", "-c", 'PART=${HOSTNAME##*-} worker']
         ports:
         - containerPort: 8080
+        {{- if .Values.worker.resources }}
+        resources:
+{{ toYaml .Values.worker.resources | indent 10 }}
+        {{- end }}
       nodeSelector:
-        {{ toYaml .Values.worker.nodeSelector | indent 8 }}
+{{ toYaml .Values.worker.nodeSelector | indent 8 }}
 
 ---
 
