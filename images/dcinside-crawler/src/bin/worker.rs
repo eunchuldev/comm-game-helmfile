@@ -75,6 +75,7 @@ impl State {
             start_page: 2,
         }
     }
+    fn crawler_delay(mut self, v: u64) -> Self { self.crawler = self.crawler.delay(v); self }
     fn start_page(mut self, v: usize) -> Self { self.start_page = v; self }
     async fn fetch_gallery_list(&self) -> Result<Vec<GalleryState>, WorkerError> {
         let bytes = self.crawler.client.get(format!("{}/list", self.live_directory_url)).query(&ListPartQuery{ total: self.total, part: self.part }).unwrap().send().await?.body().limit(1024*1024*8).await?;
@@ -182,7 +183,7 @@ async fn crawl_forever(mut state: State, delay: Duration, gauges: ResultMetricGa
         gauges.gallery_error.set(metric.gallery_error.try_into().unwrap()); 
         gauges.document_error.set(metric.document_error.try_into().unwrap()); 
         gauges.comment_error.set(metric.comment_error.try_into().unwrap()); 
-        info!("crawl done. wait {} seconds..", delay.as_secs());
+        info!("crawl done. wait {} milli seconds..", delay.as_millis());
         actix::clock::delay_for(delay).await;
     }
     Ok(())
@@ -209,6 +210,8 @@ async fn main() -> std::io::Result<()> {
 
     let part: u64 = std::env::var("PART").expect("PART").parse().expect("PART");
     let total: u64 = std::env::var("TOTAL").expect("TOTAL").parse().expect("TOTAL");
+    let delay: u64 = std::env::var("DELAY").unwrap_or("100".to_string()).parse().expect("DELAY");
+    let sleep_duration: u64 = std::env::var("SLEEP_DURATION").unwrap_or("6000".to_string()).parse().expect("SLEEP_DURATION");
 
     let prometheus = PrometheusMetrics::new("api", Some("/metrics"), None);
     let metrics = ResultMetricGauges {
@@ -234,10 +237,11 @@ async fn main() -> std::io::Result<()> {
                 &live_directory_url, 
                 &data_broker_url,
                 total,
-                part);
+                part)
+                .crawler_delay(delay);
             let res = crawl_forever(
                 state, 
-                Duration::from_secs(60), 
+                Duration::from_millis(sleep_duration), 
                 metrics.clone()).await;
             if let Err(e) = res {
                 error!("crawler restart due to: {}", e.to_string());

@@ -1,0 +1,8 @@
+image:
+spark:
+  executor:
+    image:
+    nodeSelector: {}
+reousrces: {}
+nodeSelector: {}
+token: ''

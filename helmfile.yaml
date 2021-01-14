@@ -2,6 +2,7 @@ environments:
   dev:
     secrets:
     - "envs/{{ .Environment.Name }}/data-access-secrets.yaml"
+    - "envs/{{ .Environment.Name }}/secrets.yaml"
     values:
     - "envs/values.yaml"
     - "envs/{{ .Environment.Name }}/values.yaml.gotmpl"
@@ -10,15 +11,6 @@ environments:
 repositories:
 - name: argo
   url: "https://argoproj.github.io/argo-helm"
-- name: jupyterhub
-  url: "https://jupyterhub.github.io/helm-chart/"
-
-  #- name: argo
-  #url: "https://argoproj.github.io/argo-helm"
-  #- name: grafana
-  #$url: "https://grafana.github.io/helm-charts"
-  #- name: jupyterhub
-  #url: "https://jupyterhub.github.io/helm-chart/"
 
 helmDefaults:
   wait: true
@@ -51,12 +43,14 @@ releases:
     worker:
       image: {{ index .Values.images "dcinside-crawler" }}
       replicas: 8
+      delay: 200
+      sleepDuration: 60000
       nodeSelector:
         cloud.google.com/gke-nodepool: pvm-e2-micro-pool
       resources:
         requests:
           memory: "10Mi"
-          cpu: "50m"
+          cpu: "100m"
     liveDirectory:
       image: {{ index .Values.images "dcinside-crawler" }}
       nodeSelector:
@@ -95,27 +89,22 @@ releases:
   chart: charts/argo-suppliment
   values:
   - serviceAccountName: argo-workflow
-- name: jupyterhub
-  chart: 
+- name: jupyter
+  installed: false
+  chart: charts/jupyter
+  version: 0.10.6
+  values:
+  - image: {{ index .Values.images "jupyter-singleuser" }}
+    token: {{ .Values.jupyter.token | quote }}
+    nodeSelector:
+      cloud.google.com/gke-nodepool: pvm-e2-medium-pool
+    spark:
+      executor:
+        image: {{ index .Values.images "spark" }}
+        nodeSelector:
+          cloud.google.com/gke-nodepool: pvm-e2-medium-pool
 - name: etl
   chart: charts/etl
   values:
   - images:
 {{ toYaml .Values.images | indent 6 }}
-- name: jupyterhub
-  chart: jupyterhub/jupyterhub
-  version: 0.10.6
-  values:
-  - dummy:
-    {{- if .Values.jupyterhub.ingress.host }}
-    ingress:
-      enabled: true
-      hosts: [ {{ .Values.jupyterhub.ingress.host }} ]
-      pathSuffix: "*"
-      annotations:
-        kubernetes.io/ingress.class: alb
-        alb.ingress.kubernetes.io/group.name: sa-kube-default-ingress
-        alb.ingress.kubernetes.io/scheme: internet-facing
-        alb.ingress.kubernetes.io/healthcheck-path: "/health"
-    {{- end }}
-{{ toYaml (omit .Values.jupyterhub "ingress" ) | indent 4 }}

@@ -70,6 +70,10 @@ impl<'a> Crawler {
             delay: Duration::from_millis(100),
         }
     }
+    pub fn delay(mut self, millis: u64) -> Self {
+        self.delay = Duration::from_millis(millis);
+        self
+    }
     pub async fn realtime_hot_galleries(&self) -> Result<Vec<GalleryIndex>, CrawlerError> {
         let jsonp_callback_func = format!(
             "jQuery3210837750950307798_{}",

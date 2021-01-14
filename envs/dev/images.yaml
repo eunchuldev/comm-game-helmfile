@@ -1,3 +1,4 @@
 images:
   dcinside-crawler: gcr.io/community-gamification-283222/dcinside-crawler:1fd5240
   spark: gcr.io/community-gamification-283222/spark:1042e88
+  jupyter-singleuser: gcr.io/community-gamification-283222/jupyter-singleuser:7f87afb
