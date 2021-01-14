@@ -393,8 +393,8 @@ mod tests {
     async fn documents() {
         let mut crawler = Crawler::new();
         let gallery = GalleryIndex {
-            id: String::from("comic_new2"),
-            name: String::from("프로그래밍"),
+            id: String::from("leeseunggi"),
+            name: String::from("이승기"),
             kind: GalleryKind::Major,
             rank: None,
         };

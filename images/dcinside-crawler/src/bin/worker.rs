@@ -109,16 +109,17 @@ impl State {
         for (i, gallery_state) in gallery_states.into_iter().enumerate() {
             info!("{}/{} start | {}(last crawled at {:?})", i, len, gallery_state.index.id, gallery_state.last_crawled_at);
             let now = chrono::Utc::now();
-            let res = if let Some(last_crawled_document_id) = gallery_state.last_crawled_document_id {
-                self.crawler.documents_after(&gallery_state.index, last_crawled_document_id, self.start_page).await
-            } else {
-                self.crawler.documents(&gallery_state.index, self.start_page).await
+            let res = match gallery_state.last_crawled_document_id { 
+                Some(last_crawled_document_id) if last_crawled_document_id > 0 => 
+                    self.crawler.documents_after(&gallery_state.index, last_crawled_document_id, self.start_page).await,
+                _ => 
+                    self.crawler.documents(&gallery_state.index, self.start_page).await
             };
             match &res {
                 Ok(res) => {
                     info!("crawled documents: {}", res.len());
                     metric.gallery_success += 1;
-                    let mut last_document_id = 0usize;
+                    let mut last_document_id = gallery_state.last_crawled_document_id.unwrap_or(0usize);
                     for r in res {
                         match r {
                             Ok(doc) => {
@@ -148,7 +149,7 @@ impl State {
                     if let Err(e) = self.report(GalleryCrawlReportForm {
                         id: gallery_state.index.id.clone(),
                         last_crawled_at: Some(now),
-                        last_crawled_document_id: Some(last_document_id),
+                        last_crawled_document_id: if last_document_id > 0 { Some(last_document_id) } else { None },
                     }).await {
                         error!("error while report: {}", e.to_string());
                     };

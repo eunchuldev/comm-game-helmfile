@@ -9,6 +9,6 @@ liveDirectory:
     cloud.google.com/gke-nodepool: default-pool
 dataBroker:
   bucket: 
-  prefix: "datalake/date=%F/hour=%H/"
+  prefix: "datalake/"
   nodeSelector:
     cloud.google.com/gke-nodepool: default-pool

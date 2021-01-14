@@ -1,6 +1,2 @@
-spark:
-  executor:
-    nodeSelector:
-imagePullPolicy: Always
-images: {}
-bucket: 
+images: 
+  spark: 

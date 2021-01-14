@@ -1,0 +1,3 @@
+images:
+  dcinside-crawler: gcr.io/community-gamification-283222/dcinside-crawler:6040974
+  spark: gcr.io/community-gamification-283222/spark:1042e88

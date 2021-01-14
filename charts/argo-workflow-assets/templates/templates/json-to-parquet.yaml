@@ -5,30 +5,27 @@ metadata:
 spec:
   templates:
     - name: json-to-parquet
-      volumes:
-        - name: data-access-secrets
-          secret:
-            secretName: data-access
-            defaultMode: 256
       inputs:
         parameters:
-          - name: db
-          - name: isCluster
+          - name: jsonPath
+          - name: parquetPath
+      volumes:
+      - name: data-access-secrets
+        secret:
+          secretName: data-access
+          defaultMode: 256
       script:
         volumeMounts:
-          - name: data-access-secrets
-            mountPath: /run/data-access
+        - name: data-access-secrets
+          mountPath: /run/data-access
         env:
-          - name: GOOGLE_APPLICATION_CREDENTIALS
-        image: {{ required "awsCliEcsong image value is required" .Values.images.awsCliEcsong }}
-        imagePullPolicy: {{ .Values.imagePullPolicy | default "Always" }}
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /run/data-access/service-account.json
+        - name: SPARK_EXECUTOR_IMAGE
+          value: {{ index .Values.images "spark" }}
+        image: {{ index .Values.images "spark" }}
+        imagePullPolicy: IfNotPresent
         command: [bash]
         source: |
-          /scripts/rds-snapshot-export/rds-snapshot-export \
-            -b {{ .Values.rdsExportBucket | quote }} \
-            -d {{`{{inputs.parameters.db}}` | quote }} \
-            -k {{ .Values.rdsExportKmsKeyArn | quote }} \
-            -r {{ .Values.dataAccessRoleArn | quote }} \
-            -c {{`{{inputs.parameters.isCluster}}` | quote }} \
-            -p {{`{{inputs.parameters.db}}` | quote }} \
-            -t "43200"
+          echo {{`{{inputs.parameters.jsonPath}}` | quote }}
+          echo {{`{{inputs.parameters.parquetPath}}` | quote }}

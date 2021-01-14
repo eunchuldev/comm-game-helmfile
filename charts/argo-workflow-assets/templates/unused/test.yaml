@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: test-etl
+spec:
+  entrypoint: test
+  templates:
+  - name: test
+    dag:
+      tasks:
+      - name: json-to-parquet
+        templateRef:
+          name: json-to-parquet
+          template: json-to-parquet
+        arguments:
+          parameters:
+          - name: jsonPath
+            value: jsonPath
+          - name: parquetPath
+            value: parquetPath
