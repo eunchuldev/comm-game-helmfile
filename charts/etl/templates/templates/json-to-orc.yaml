@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: json-to-orc
+spec:
+  templates:
+    - name: json-to-orc
+      inputs:
+        parameters:
+          - name: jsonPath
+          - name: orcPath
+          - name: timestampColumn
+            value: created_at
+      volumes:
+      - name: data-access-secrets
+        secret:
+          secretName: data-access
+          defaultMode: 256
+      nodeSelector:
+        cloud.google.com/gke-nodepool: pvm-e2-medium-pool
+      script:
+        volumeMounts:
+        - name: data-access-secrets
+          mountPath: /run/data-access
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /run/data-access/service-account.json
+        - name: SPARK_EXECUTOR_IMAGE
+          value: {{ index .Values.images "spark" }}
+        image: {{ index .Values.images "spark" }}
+        imagePullPolicy: IfNotPresent
+        command: [python]
+        source: |
+          json_path = "{{`{{inputs.parameters.jsonPath}}`}}"
+          orc_path = "{{`{{inputs.parameters.orcPath}}`}}"
+          timestamp_column = "{{`{{inputs.parameters.timestampColumn}}`}}"
+          from pyspark.sql import SparkSession, types as T, functions as F, Row
+          spark = (SparkSession.builder.master('local').getOrCreate())
+          df = spark.read.format('json').load(json_path)
+          def _bulk_cast(schema, name, type):
+              if schema.get('name') == name: schema['type'] = type
+              if isinstance(schema.get('type'), dict): _bulk_cast(schema['type'], name, type)
+              if isinstance(schema.get('elementType'), dict): _bulk_cast(schema['elementType'], name, type)
+              for f in schema.get('fields', []): _bulk_cast(f, name, type)
+              return schema
+          def bulk_cast(df, name, type):
+              new_schema = T.StructType.fromJson(_bulk_cast(df.schema.jsonValue(), name, type))
+              for o,n in zip(df.schema.fields, new_schema.fields):
+                  if o != n: df = df.withColumn(o.name, F.col(o.name).cast(n.dataType))
+              return df
+          df = bulk_cast(df, timestamp_column, 'timestamp')
+          (df.coalesce(1).write
+            .format('orc').mode('overwrite').option('compression', 'zlib')
+            .save(orc_path))

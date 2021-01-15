@@ -1,0 +1,5 @@
+image: 
+nodePool: crawler-pool
+lifetimeMin: 60
+podLabel: app=dc-crawler-worker
+maxNodeCount: 1000

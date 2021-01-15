@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: nominal-time
+spec:
+  templates:
+    - name: hourly
+      container:
+        image: busybox:stable
+        imagePullPolicy: IfNotPresent
+        command: [sh, -c, 'date +"%H" > /tmp/hour && date +"%F" > /tmp/date && date -I"hours" > /tmp/timestamp']
+      outputs:
+        parameters:
+        - name: hour
+          valueFrom: 
+            path: /tmp/hour
+        - name: date
+          valueFrom:
+            path: /tmp/date
+        - name: timestamp
+          valueFrom:
+            path: /tmp/timestamp

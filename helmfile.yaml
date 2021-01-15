@@ -36,32 +36,40 @@ releases:
       prefix: datalake/json/dcinside/document/
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool
-      resources:
-        requests:
-          memory: "100Mi"
-          cpu: "50m"
+      #resources:
+        #requests:
+        #  memory: "100Mi"
+        #  cpu: "50m"
     worker:
       image: {{ index .Values.images "dcinside-crawler" }}
       replicas: 8
       delay: 200
       sleepDuration: 60000
       nodeSelector:
-        cloud.google.com/gke-nodepool: pvm-e2-micro-pool
+        cloud.google.com/gke-nodepool: crawler-pool
       resources:
         requests:
           memory: "10Mi"
-          cpu: "100m"
+          cpu: "150m"
     liveDirectory:
       image: {{ index .Values.images "dcinside-crawler" }}
       nodeSelector:
         cloud.google.com/gke-nodepool: default-pool
-      resources:
-        requests:
-          memory: "100Mi"
-          cpu: "20m"
+      #resources:
+      #  requests:
+      #    memory: "100Mi"
+      #    cpu: "20m"
+- name: crawler-node-rotator
+  chart: charts/crawler-node-rotator
+  values:
+  - image: {{ index .Values.images "crawler-node-rotator" }}
+    nodePool: crawler-pool
+    lifetimeMin: 60
+    podLabel: "app=dc-crawler-worker"
+    maxNodeCount: 4
 - name: argo
   chart: argo/argo
-  version: 0.14.0
+  version: 0.15.2
   needs: [ argo-suppliment ]
   values:
   - singleNamespace: true
@@ -74,6 +82,9 @@ releases:
         serviceAccountKeySecret:
           name: data-access
           key: "service-account.json"
+  - server:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: default-pool
   - controller:
       workflowDefaults:
         spec:
@@ -97,14 +108,19 @@ releases:
   - image: {{ index .Values.images "jupyter-singleuser" }}
     token: {{ .Values.jupyter.token | quote }}
     nodeSelector:
-      cloud.google.com/gke-nodepool: pvm-e2-medium-pool
+      cloud.google.com/gke-nodepool: etl-pool
     spark:
       executor:
         image: {{ index .Values.images "spark" }}
         nodeSelector:
-          cloud.google.com/gke-nodepool: pvm-e2-medium-pool
+          cloud.google.com/gke-nodepool: etl-pool
+    #ingress:
+      #host: jupyter.dcgle.com
 - name: etl
+  installed: false
   chart: charts/etl
+  disableValidation: true
+  needs: [ argo ]
   values:
   - images:
 {{ toYaml .Values.images | indent 6 }}

@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: etl
+spec:
+  timezone: UTC
+  schedule: "30 * * * *"
+  concurrencyPolicy: Allow
+  startingDeadlineSeconds: 4000
+  workflowSpec:
+    entrypoint: etl
+    templates:
+      - name: etl
+        dag:
+          tasks:
+            - name: nominal-time-hourly
+              templateRef:
+                name: nominal-time
+                template: hourly
+            - name: dcinside-json-to-orc
+              templateRef:
+                name: json-to-orc
+                template: json-to-orc
+              depends: nominal-time-hourly
+              arguments:
+                parameters:
+                  - name: jsonPath
+                    value: {{`gs://datalake-cg/datalake/json/dcinside/document/date={{tasks.nominal-time-hourly.outputs.parameters.date}}/hour={{tasks.nominal-time-hourly.outputs.parameters.hour}}/`}}
+                  - name: orcPath
+                    value: {{`gs://datalake-cg/datalake/orc/dcinside/document/date={{tasks.nominal-time-hourly.outputs.parameters.date}}/`}}

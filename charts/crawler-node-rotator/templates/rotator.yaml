@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: crawler-node-rotator
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: crawler-node-rotator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: crawler-node-rotator
+subjects:
+- kind: ServiceAccount
+  name: crawler-node-rotator
+  namespace: default
+
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crawler-node-rotator
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: [""]
+  resources: ["pods/eviction"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["*"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets"]
+  verbs: ["get", "list", "watch"]
+
+---
+
+
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: crawler-node-rotator
+spec:
+  schedule: "*/30 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: crawler-node-rotator
+          containers:
+          - name: rotator
+            image: {{ .Values.image }}
+            imagePullPolicy: IfNotPresent
+            env:
+              - name: NODE_POOL
+                value: {{ .Values.nodePool | quote }}
+              - name: NODE_LIFETIME_MIN
+                value: {{ .Values.lifetimeMin | quote }}
+              - name: POD_LABEL
+                value: {{ .Values.podLabel | quote }}
+              - name: MAX_NODE_COUNT
+                value: {{ .Values.maxNodeCount | quote }}

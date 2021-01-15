@@ -5,6 +5,7 @@ metadata:
   labels:
     app: dc-crawler-worker
 spec:
+  podManagementPolicy: Parallel
   replicas: {{ .Values.worker.replicas }}
   selector:
     matchLabels:
@@ -43,6 +44,17 @@ spec:
         {{- end }}
       nodeSelector:
 {{ toYaml .Values.worker.nodeSelector | indent 8 }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: "app"
+                  operator: In
+                  values: [ "dc-crawler-worker" ]
+              topologyKey: "kubernetes.io/hostname"
 
 ---
 

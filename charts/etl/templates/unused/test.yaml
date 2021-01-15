@@ -8,13 +8,23 @@ spec:
   - name: test
     dag:
       tasks:
-      - name: json-to-parquet
+      - name: nominal-time-hourly
         templateRef:
-          name: json-to-parquet
-          template: json-to-parquet
+          name: nominal-time
+          template: hourly
+      - name: print-result
+        template: print-result 
+        depends: "nominal-time-hourly"
         arguments:
-          parameters:
-          - name: jsonPath
-            value: "gs://datalake-cg/json/dcinside/document/date=2021-01-14/"
-          - name: parquetPath
-            value: "gs://datalake-cg/parquet/dcinside/document/date=2021-01-14/"
+          artifacts:
+          - name: timestamp
+            from: "{{tasks.nominal-time-hourly.outputs.artifacts.timestamp}}"
+  - name: print-result
+    inputs:
+      artifacts:
+      - name: timestamp
+        path: /tmp/timestamp
+    container:
+      image: busybox:stable
+      command: [sh, -c]
+      args: ["cat /tmp/timestamp"]

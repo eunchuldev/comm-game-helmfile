@@ -39,7 +39,21 @@ spec:
         resources:
 {{ toYaml .Values.resources | indent 10 }}
         {{- end }}
-        command: ["start.sh", "jupyter lab --LabApp.token='{{ .Values.token }}'"]
+        command: ["start.sh", "jupyter",  "lab", "--NotebookApp.token={{ .Values.token }}"]
+        livenessProbe:
+          httpGet:
+            path: /robots.txt
+            port: 8888
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 2
+        readinessProbe:
+          httpGet:
+            path: /robots.txt
+            port: 8888
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 2
       volumes:
       - name: data-access
         secret:
@@ -60,9 +74,25 @@ metadata:
 spec:
   ports:
   - port: 8888
+    name: jupyter
+    targetPort: 8888
   selector:
     app: jupyter
   type: "NodePort"
+
+---
+
+{{ if .Values.ingress }}
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: jupyter
+spec:
+  backend:
+    serviceName: jupyter
+    servicePort: jupyter
+
+{{ end }}
 
 ---
 
