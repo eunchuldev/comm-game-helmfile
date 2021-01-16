@@ -1,4 +1,3 @@
-# pvc-demo.yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

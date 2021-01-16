@@ -14,7 +14,7 @@ repositories:
 
 helmDefaults:
   wait: true
-  timeout: 60
+  timeout: 300
   atomic: true
   cleanupOnFail: false
   kubeContext: {{ requiredEnv "KUBE_CONTEXT" }}
@@ -43,6 +43,7 @@ releases:
     worker:
       image: {{ index .Values.images "dcinside-crawler" }}
       replicas: 8
+      distribute: false
       delay: 200
       sleepDuration: 60000
       nodeSelector:
@@ -50,7 +51,7 @@ releases:
       resources:
         requests:
           memory: "10Mi"
-          cpu: "150m"
+          cpu: "10m"
     liveDirectory:
       image: {{ index .Values.images "dcinside-crawler" }}
       nodeSelector:
@@ -101,14 +102,14 @@ releases:
   values:
   - serviceAccountName: argo-workflow
 - name: jupyter
-  installed: false
+  installed: true
   chart: charts/jupyter
   version: 0.10.6
   values:
   - image: {{ index .Values.images "jupyter-singleuser" }}
     token: {{ .Values.jupyter.token | quote }}
     nodeSelector:
-      cloud.google.com/gke-nodepool: etl-pool
+      cloud.google.com/gke-nodepool: default-pool
     spark:
       executor:
         image: {{ index .Values.images "spark" }}
@@ -117,10 +118,12 @@ releases:
     #ingress:
       #host: jupyter.dcgle.com
 - name: etl
-  installed: false
+  installed: true
   chart: charts/etl
   disableValidation: true
   needs: [ argo ]
   values:
   - images:
 {{ toYaml .Values.images | indent 6 }}
+    nodeSelector:
+      cloud.google.com/gke-nodepool: etl-pool

@@ -69,17 +69,25 @@ pub enum User {
         #[serde(rename(deserialize = "user_id"), deserialize_with = "skip_empty_str")]
         id: String, 
         #[serde(rename(deserialize = "name"))]
-        nickname: String 
+        nickname: String, 
+        #[serde(skip_deserializing)]
+        ip: Option<bool>
     },
     Dynamic { 
         #[serde(deserialize_with = "skip_empty_str")]
         ip: String,
         #[serde(rename(deserialize = "name"))]
         nickname: String, 
+        #[serde(skip_deserializing)]
+        id: Option<bool>
     },
     Unknown {
         #[serde(rename(deserialize = "name"))]
         nickname: String, 
+        #[serde(skip_deserializing)]
+        ip: Option<bool>,
+        #[serde(skip_deserializing)]
+        id: Option<bool>
     },
 }
 
@@ -135,7 +143,7 @@ where
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-pub struct Comment {
+pub struct FromComment {
     #[serde(rename(deserialize = "no"), deserialize_with = "serde_aux::field_attributes::deserialize_number_from_string")]
     pub id: usize,
     #[serde(flatten)]
@@ -143,14 +151,30 @@ pub struct Comment {
     pub depth: usize,
     #[serde(rename(deserialize = "memo"))]
     pub contents: CommentContents,
-    #[serde(skip_deserializing)]
-    pub parent_id: Option<usize>,
     #[serde(rename(deserialize = "reg_date"), deserialize_with="comment_time")]
     pub created_at: Option<DateTime<Utc>>,
-    #[serde(skip_deserializing)]
-    pub document_id: usize,
-    #[serde(skip_deserializing)]
-    pub gallery_id: String,
+}
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(from="FromComment")]
+pub struct Comment {
+    pub id: usize,
+    pub author: User,
+    pub depth: usize,
+    pub contents: CommentContents,
+    pub parent_id: Option<usize>,
+    pub created_at: Option<DateTime<Utc>>,
+}
+impl From<FromComment> for Comment {
+    fn from(f: FromComment) -> Comment {
+        Self {
+            id: f.id,
+            author: f.author,
+            depth: f.depth,
+            contents: f.contents,
+            created_at: f.created_at,
+            parent_id: None,
+        }
+    }
 }
 
 
@@ -193,10 +217,10 @@ pub fn parse_document_indexes(
                 let ip = writer_node.attr("data-ip");
                 let id = writer_node.attr("data-uid");
                 match (id, ip) {
-                    (Some(id), None) => Ok(User::Static { id: id.into(), nickname: nickname.into(), }),
-                    (Some(id), Some(ip)) if ip.is_empty() => Ok(User::Static { id: id.into(), nickname: nickname.into(), }),
-                    (None, Some(ip)) => Ok(User::Dynamic { ip: ip.into(), nickname: nickname.into(), }),
-                    (Some(id), Some(ip)) if id.is_empty() => Ok(User::Dynamic { ip: ip.into(), nickname: nickname.into(), }),
+                    (Some(id), None) => Ok(User::Static { id: id.into(), nickname: nickname.into(), ip: None }),
+                    (Some(id), Some(ip)) if ip.is_empty() => Ok(User::Static { id: id.into(), nickname: nickname.into(), ip: None }),
+                    (None, Some(ip)) => Ok(User::Dynamic { ip: ip.into(), nickname: nickname.into(), id: None }),
+                    (Some(id), Some(ip)) if id.is_empty() => Ok(User::Dynamic { ip: ip.into(), nickname: nickname.into(), id: None }),
                     _ => Err(DocumentParseError::Select { path: ".us-post .gall_writer@(data-ip | data-id)", html: body.to_string() }),
                 }?
             };
@@ -275,8 +299,6 @@ pub fn parse_comments(
             if let Some(mut comments) = body.comments {
                 let mut last_root_comment_id = if let Some(id) = last_root_comment_id { id } else { 0usize };
                 for c in comments.iter_mut() {
-                    c.document_id = document_id;
-                    c.gallery_id = gallery_id.to_string();
                     if c.depth == 0 {
                         last_root_comment_id = c.id;
                     } else if last_root_comment_id > 0 {
@@ -333,6 +355,14 @@ mod tests {
             User::Dynamic { ip, .. } => ip.is_empty(),
             User::Unknown { .. }=> { false }
         }));
+    }
+    #[test]
+    fn it_deserializes_comments() {
+        let (res, max_page) = parse_comments(include_str!("../assets/comments.json"), "gallery_id", 1, None).unwrap();
+        let res = serde_json::to_string(&res[0]).unwrap();
+        let expected = "{\"id\":13369033,\"author\":{\"ip\":\"119.195\",\"nickname\":\"ㅇㅇ\",\"id\":null},\"depth\":0,\"contents\":\"이제 뻑가,이슈왕 같은 랙카들이 청원하라고 한번 더 할듯ㅋㅋ  - dc App\",\"parent_id\":null,\"created_at\":\"2021-01-10T08:20:43Z\"}".to_string();
+        assert_eq!(expected, res);
+        //assert_eq!(!res[0], Comment{});
     }
     #[test]
     fn it_parses_document_body() {

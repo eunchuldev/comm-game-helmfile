@@ -22,9 +22,9 @@ ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../" >/dev/null 2>&1 && pwd )"
 
 for dir in "$ROOT"/images/*
 do
-  dir=${dir%*/} 
-  name=${dir##*/}
-  name=$(echo "$name" | sed 's/^[0-9_\-]*//g')
+  dir="${dir%*/}"
+  name="${dir##*/}"
+  name="$(echo "$name" | sed 's/^[0-9_\-]*//g')"
   DOCKER_BUILDKIT=1 docker build -t "$name:$TAG" "$dir"
   if [ "$IMAGE" == "$name" ]; then 
     break

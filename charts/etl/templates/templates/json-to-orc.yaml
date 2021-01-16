@@ -16,8 +16,10 @@ spec:
         secret:
           secretName: data-access
           defaultMode: 256
+      {{- if .Values.nodeSelector }}
       nodeSelector:
-        cloud.google.com/gke-nodepool: pvm-e2-medium-pool
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      {{- end }}
       script:
         volumeMounts:
         - name: data-access-secrets

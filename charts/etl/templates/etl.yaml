@@ -4,27 +4,27 @@ metadata:
   name: etl
 spec:
   timezone: UTC
-  schedule: "30 * * * *"
+  schedule: "0 3 * * *"
   concurrencyPolicy: Allow
-  startingDeadlineSeconds: 4000
+  startingDeadlineSeconds: 90000
   workflowSpec:
     entrypoint: etl
     templates:
       - name: etl
         dag:
           tasks:
-            - name: nominal-time-hourly
+            - name: nominal-time
               templateRef:
                 name: nominal-time
-                template: hourly
+                template: daily
             - name: dcinside-json-to-orc
               templateRef:
                 name: json-to-orc
                 template: json-to-orc
-              depends: nominal-time-hourly
+              depends: nominal-time
               arguments:
                 parameters:
                   - name: jsonPath
-                    value: {{`gs://datalake-cg/datalake/json/dcinside/document/date={{tasks.nominal-time-hourly.outputs.parameters.date}}/hour={{tasks.nominal-time-hourly.outputs.parameters.hour}}/`}}
+                    value: {{`gs://datalake-cg/datalake/json/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
                   - name: orcPath
-                    value: {{`gs://datalake-cg/datalake/orc/dcinside/document/date={{tasks.nominal-time-hourly.outputs.parameters.date}}/`}}
+                    value: {{`gs://datalake-cg/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}

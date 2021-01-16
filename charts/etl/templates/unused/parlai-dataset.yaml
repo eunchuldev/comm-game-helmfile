@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: parl-dataset
+spec:
+  templates:
+    - name: dcinside
+      inputs:
+        parameters:
+          - name: inputPath
+          - name: format
+            value: orc
+          - name: outputPath
+      volumes:
+      - name: data-access-secrets
+        secret:
+          secretName: data-access
+          defaultMode: 256
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      {{- end }}
+      script:
+        volumeMounts:
+        - name: data-access-secrets
+          mountPath: /run/data-access
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /run/data-access/service-account.json
+        - name: SPARK_EXECUTOR_IMAGE
+          value: {{ index .Values.images "spark" }}
+        image: {{ index .Values.images "spark" }}
+        imagePullPolicy: IfNotPresent
+        command: [python]
+        source: |
+          input_path = "{{`{{inputs.parameters.inputPath}}`}}"
+          format = "{{`{{inputs.parameters.format}}`}}"
+          output_path = "{{`{{inputs.parameters.outputPath}}`}}"
+          from pyspark.sql import SparkSession, types as T, functions as F, Row
+          spark = (SparkSession.builder.master('local').getOrCreate())
+          df = spark.read.format(format).load(input_path)
+          df = df.select("title", "comments")
+          (df.coalesce(1).write
+            .format('orc').mode('overwrite').option('compression', 'zlib')
+            .save(orc_path))

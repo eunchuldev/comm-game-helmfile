@@ -1,5 +1,5 @@
 py4j
 pandas
-nbgitpuller
-jupyter-server-proxy
-
+pyarrow
+seaborn
+scikit-learn

@@ -8,12 +8,38 @@ spec:
       container:
         image: busybox:stable
         imagePullPolicy: IfNotPresent
-        command: [sh, -c, 'date +"%H" > /tmp/hour && date +"%F" > /tmp/date && date -I"hours" > /tmp/timestamp']
+        command: [sh]
+        args: 
+          - -c
+          - >-
+            hoursago="$(( $(date +%s) - 3600 ))" &&
+            date -D %s +"%H" -u -d "$hoursago" > /tmp/hour && 
+            date -D %s +"%F" -u -d "$hoursago" > /tmp/date && 
+            date -D %s +'%FT%H:00:00Z' -u -d "$hoursago" > /tmp/timestamp
       outputs:
         parameters:
         - name: hour
           valueFrom: 
             path: /tmp/hour
+        - name: date
+          valueFrom:
+            path: /tmp/date
+        - name: timestamp
+          valueFrom:
+            path: /tmp/timestamp
+    - name: daily
+      container:
+        image: busybox:stable
+        imagePullPolicy: IfNotPresent
+        command: [sh]
+        args: 
+          - -c
+          - >-
+            daysago="$(( $(date +%s) - 24*3600 ))" &&
+            date -D %s +"%F" -u -d "$daysago" > /tmp/date && 
+            date -D %s +'%FT00:00:00Z' -u -d "$daysago" > /tmp/timestamp
+      outputs:
+        parameters:
         - name: date
           valueFrom:
             path: /tmp/date

@@ -6,5 +6,6 @@ spark:
 reousrces: {}
 nodeSelector: {}
 token: ''
-ingress:
-  host:
+service:
+  type: NodePort
+ingress: {}
