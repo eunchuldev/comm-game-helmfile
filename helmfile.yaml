@@ -108,6 +108,9 @@ releases:
   values:
   - image: {{ index .Values.images "jupyter-singleuser" }}
     token: {{ .Values.jupyter.token | quote }}
+    extraEnv:
+      SPARK_EXTRA_CONFIGS: |
+        spark.kubernetes.executor.secrets.data-access=/run/data-access/
     nodeSelector:
       cloud.google.com/gke-nodepool: default-pool
     spark:

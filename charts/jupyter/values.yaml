@@ -3,6 +3,7 @@ spark:
   executor:
     image:
     nodeSelector: {}
+extraEnv: {}
 reousrces: {}
 nodeSelector: {}
 token: ''

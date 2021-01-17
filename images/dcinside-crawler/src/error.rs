@@ -12,6 +12,8 @@ pub enum DocumentParseError {
     DatetimeParse { path: &'static str },
     #[error(display = "fail to parse" )]
     JsonParse(#[source] serde_json::Error),
+    #[error(display = "need adult auth")]
+    AdultPage,
 }
 
 #[derive(Error, Debug)]
@@ -64,4 +66,20 @@ pub enum LiveDirectoryError {
     Crawler(#[source] CrawlerError),
     #[error(display = "sled")]
     Sled(#[source] sled::Error),
+}
+
+#[derive(Error, Debug)]
+pub enum BackOffError {
+    #[error(display = "backoff error: {}", _0)]
+    CrawlerError(#[source] CrawlerError),
+    #[error(display = "backoff error(break): {}", _0)]
+    Break(CrawlerError),
+}
+impl From<BackOffError> for CrawlerError {
+    fn from(f: BackOffError) -> CrawlerError {
+        match f {
+            BackOffError::CrawlerError(e) => e,
+            BackOffError::Break(e) => e,
+        }
+    }
 }

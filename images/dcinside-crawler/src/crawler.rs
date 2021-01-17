@@ -35,7 +35,7 @@ struct CommentsPostForm<'a> {
     _GALLTYPE_: &'a str,
 }
 
-async fn back_off<F, O, E>(delay: usize, max_delay: usize, f: impl Fn() -> F) -> Result<O, E>
+async fn back_off<F, O, E>(delay: u64, max_delay: u64, f: impl Fn() -> F) -> Result<O, E>
 where F: futures::Future<Output = Result<O, E>>,
 {
     let mut i = 0;
@@ -44,7 +44,9 @@ where F: futures::Future<Output = Result<O, E>>,
         if res.is_ok() || i*delay >= max_delay {
             break res;
         }
+        println!("{} {}", "backoff..", i);
         i += 1;
+        actix::clock::delay_for(Duration::from_millis(delay*i)).await;
     }
 }
 
@@ -97,6 +99,33 @@ impl<'a> Crawler {
             let mut galleries: Vec<GalleryIndex> = serde_json::from_str(&jsonp_contents)?;
             for g in galleries.iter_mut() {
                 g.kind = GalleryKind::Major;
+            }
+            Ok::<_, CrawlerError>(galleries)
+        }).await?)
+    }
+    pub async fn realtime_hot_minor_galleries(&self) -> Result<Vec<GalleryIndex>, CrawlerError> {
+        let jsonp_callback_func = format!(
+            "jQuery32107665147071438096_{}",
+            Utc::now().timestamp_millis()
+        );
+        let path = format!(
+            "https://json2.dcinside.com/json1/mgallmain/mgallery_ranking.php?jsoncallback={}&_={}",
+            jsonp_callback_func,
+            Utc::now().timestamp_millis()
+        );
+        Ok(back_off(1000, 1000*10, || async {
+            let bytes = self
+                .client
+                .get(path.as_str())
+                .header("Referer", "https://gall.dcinside.com/m")
+                .send().await?
+                .body().limit(1024*1024*8).await?;
+            let text = std::str::from_utf8(&bytes)?;
+            let trimed = text.trim();
+            let jsonp_contents = &trimed[jsonp_callback_func.len() + 1..trimed.len() - 1];
+            let mut galleries: Vec<GalleryIndex> = serde_json::from_str(&jsonp_contents)?;
+            for g in galleries.iter_mut() {
+                g.kind = GalleryKind::Minor;
             }
             Ok::<_, CrawlerError>(galleries)
         }).await?)
@@ -293,6 +322,9 @@ impl<'a> Crawler {
                 .send().await?
                 .body().limit(1024*1024*8).await?;
             let text = std::str::from_utf8(&bytes)?;
+            if text.starts_with("<script type=\"text/javascript\">location.replace(\"/error/adault") {
+                Err(DocumentParseError::AdultPage)?;
+            }
             let e_s_n_o = Some(HTMLDocument::from(text)
                 .select(Attr("id", "e_s_n_o"))
                 .next()
@@ -303,32 +335,6 @@ impl<'a> Crawler {
         }).await?;
         self.e_s_n_o = e_s_n_o;
         Ok(res)
-        /*parse_document_indexes(text)
-        .map_err(|e| CrawlerError::DocumentParseError{
-            source: e,
-            gallery: gallery.id.clone(),
-            page: page,
-        })?.into_iter().collect::<Result<Vec<_>, DocumentParseError>>()
-        .map_err(|e| CrawlerError::DocumentParseError{
-            source: e,
-            gallery: gallery.id.clone(),
-            page: page,
-        })*/
-        /*Ok(parse_document_indexes(text, &gallery.id)
-            .map_err(|e| CrawlerError::DocumentParseError {
-                source: e,
-                gallery: gallery.id.clone(),
-                page: page,
-            })?
-            .into_iter()
-            .filter_map(|res| match res {
-                Ok(res) => Some(res),
-                Err(err) => {
-                    warn!("{}", err);
-                    None
-                }
-            })
-            .collect())*/
     }
 }
 impl Default for Crawler {
@@ -348,6 +354,15 @@ mod tests {
         assert!(!res[0].id.is_empty());
         assert!(!res[0].name.is_empty());
         assert_eq!(res[0].kind, GalleryKind::Major);
+    }
+    #[actix_rt::test]
+    async fn realtime_hot_minor_galleries() {
+        let crawler = Crawler::new();
+        let res = crawler.realtime_hot_minor_galleries().await.unwrap();
+        assert!(!res.is_empty());
+        assert!(!res[0].id.is_empty());
+        assert!(!res[0].name.is_empty());
+        assert_eq!(res[0].kind, GalleryKind::Minor);
     }
     #[actix_rt::test]
     async fn document_indexes() {
@@ -373,12 +388,12 @@ mod tests {
         let mut crawler = Crawler::new();
         let gallery = GalleryIndex {
             
-            id: String::from("comic_new2"),
+            id: String::from("programming"),
             name: String::from("프로그래밍"),
             kind: GalleryKind::Major,
             rank: None,
         };
-        let res = crawler.comments(&gallery, 7850325).await.unwrap();
+        let res = crawler.comments(&gallery, 1595404).await.unwrap();
         assert!(!res.is_empty());
         assert!(res.len() >= 1);
         assert!(!res.iter().any(|c| match &c.author {
@@ -397,7 +412,7 @@ mod tests {
     async fn documents() {
         let mut crawler = Crawler::new();
         let gallery = GalleryIndex {
-            id: String::from("leeseunggi"),
+            id: String::from("lovegame"),
             name: String::from("이승기"),
             kind: GalleryKind::Major,
             rank: None,

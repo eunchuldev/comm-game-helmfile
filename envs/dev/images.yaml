@@ -1,6 +1,6 @@
 images:
-  dcinside-crawler: gcr.io/community-gamification-301712/dcinside-crawler:e6f4a28
-  spark: gcr.io/community-gamification-301712/spark:05fecaf
-  jupyter-singleuser: gcr.io/community-gamification-301712/jupyter-singleuser:6de80b6
+  dcinside-crawler: gcr.io/community-gamification-301712/dcinside-crawler:41cecfa
+  spark: gcr.io/community-gamification-301712/spark:41cecfa
+  jupyter-singleuser: gcr.io/community-gamification-301712/jupyter-singleuser:41cecfa
   gcloud-kubectl: gcr.io/community-gamification-301712/gcloud-kubectl:05fecaf
   crawler-node-rotator: gcr.io/community-gamification-301712/crawler-node-rotator:4006a23

@@ -196,6 +196,11 @@ pub fn parse_document_indexes(
     gallery_id: &str,
 ) -> Result<Vec<Result<DocumentIndex, DocumentParseError>>, DocumentParseError> {
     let doc = HTMLDocument::from(body);
+
+    if body.starts_with("<script type=\"text/javascript\">location.replace(\"/error/adault") {
+        return Err(DocumentParseError::AdultPage);
+    }
+
     Ok(doc
         .select(Class("us-post"))
         .map(|node| -> Result<_, DocumentParseError> {

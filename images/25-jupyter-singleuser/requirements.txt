@@ -3,3 +3,5 @@ pandas
 pyarrow
 seaborn
 scikit-learn
+nbgitpuller
+jupyter-server-proxy

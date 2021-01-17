@@ -12,25 +12,21 @@ USER root
 # Setup dependencies for Google Cloud Storage access.
 RUN rm $SPARK_HOME/jars/guava-29.0-jre.jar
 ADD https://repo1.maven.org/maven2/com/google/guava/guava/30.0-jre/guava-30.0-jre.jar $SPARK_HOME/jars
-RUN chmod 644 $SPARK_HOME/jars/guava-30.0-jre.jar
 # Add the connector jar needed to access Google Cloud Storage using the Hadoop FileSystem API.
 ADD https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-latest-hadoop3.jar $SPARK_HOME/jars
-RUN chmod 644 $SPARK_HOME/jars/gcs-connector-latest-hadoop3.jar
 ADD https://storage.googleapis.com/spark-lib/bigquery/spark-bigquery-latest_2.12.jar $SPARK_HOME/jars
-RUN chmod 644 $SPARK_HOME/jars/spark-bigquery-latest_2.12.jar
 
 # Setup dependencies for Azure Blob Storage access.
 ADD https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-azure/3.3.0/hadoop-azure-3.3.0.jar $SPARK_HOME/jars
-RUN chmod 644 $SPARK_HOME/jars/hadoop-azure-3.3.0.jar
 
 # Setup for the Prometheus JMX exporter.
 # Add the Prometheus JMX exporter Java agent jar for exposing metrics sent to the JmxSink to Prometheus.
-ADD https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.11.0/jmx_prometheus_javaagent-0.11.0.jar /prometheus/
-RUN chmod 644 /prometheus/jmx_prometheus_javaagent-0.11.0.jar
+ADD https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.11.0/jmx_prometheus_javaagent-0.11.0.jar $SPARK_HOME/jars
 
 # Mysql Connector
 ADD https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.11/mysql-connector-java-8.0.11.jar $SPARK_HOME/jars
-RUN chmod 644 $SPARK_HOME/jars/mysql-connector-java-8.0.11.jar
+
+RUN chmod -R 777 $SPARK_HOME/jars/
 
 ARG APT_PACKAGES="python3-pip python3 procps"
 RUN apt-get update && \
@@ -60,10 +56,6 @@ RUN cd /opt/spark/python && \
   ln -s $SPARK_HOME/data ${PYSPARK_HOME}/data && \
   ln -s $SPARK_HOME/license ${PYSPARK_HOME}/license && \
   ln -s $SPARK_HOME/pyspark ${PYSPARK_HOME}/pyspark
-
-RUN mkdir -p /etc/metrics/conf
-COPY metric-conf/metrics.properties /etc/metrics/conf
-COPY metric-conf/prometheus.yaml /etc/metrics/conf
 
 ARG spark_uid=185
 
