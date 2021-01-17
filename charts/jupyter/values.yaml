@@ -8,4 +8,5 @@ nodeSelector: {}
 token: ''
 service:
   type: NodePort
+  nodePort: 
 ingress: {}

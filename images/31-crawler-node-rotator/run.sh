@@ -31,6 +31,11 @@ for node in $nodes; do
   kubectl wait --for=condition=ready --timeout=24h pod -l="$pod_label"
 done
 for node in $nodes; do
+  set +e
   kubectl uncordon "$node"
+  if [ "$?" -gt 0 ]; then
+    echo "fail to uncordon $node. might already scale-downed?"
+  fi
+  set -e
 done
 echo done

@@ -115,6 +115,9 @@ releases:
         image: {{ index .Values.images "spark" }}
         nodeSelector:
           cloud.google.com/gke-nodepool: etl-pool
+    service:
+      type: NodePort
+      nodePort: 30001
     #ingress:
       #host: jupyter.dcgle.com
 - name: etl

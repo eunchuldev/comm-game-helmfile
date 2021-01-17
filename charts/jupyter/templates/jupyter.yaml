@@ -96,6 +96,9 @@ spec:
   ports:
   - port: 8888
     name: jupyter
+    {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePort }}
+    nodePort: {{ .Values.service.nodePort }}
+    {{- end }}
     targetPort: 8888
   selector:
     app: jupyter
