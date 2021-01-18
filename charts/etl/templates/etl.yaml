@@ -28,3 +28,16 @@ spec:
                     value: {{`gs://datalake-cg/datalake/json/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
                   - name: orcPath
                     value: {{`gs://datalake-cg/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
+            - name: dcinside-parlai-dataset
+              templateRef:
+                name: parlai-dataset
+                template: dcinside
+              depends: dcinside-json-to-orc
+              arguments:
+                parameters:
+                  - name: inputPath
+                    value: {{`gs://datalake-cg/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
+                  - name: format
+                    value: orc
+                  - name: outputPath
+                    value: {{`gs://datalake-cg/datalake/parlai/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
