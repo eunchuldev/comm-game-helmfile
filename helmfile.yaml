@@ -30,6 +30,7 @@ releases:
   - secrets: 
 {{ toYaml .Values.dataAccessSecrets | indent 6 }}
 - name: dcinside-crawler-major
+  installed: true
   chart: charts/dcinside-crawler
   values:
   - dataBroker:
@@ -42,6 +43,8 @@ releases:
         #  memory: "100Mi"
         #  cpu: "50m"
     worker:
+      labels: 
+        app.kubernetes.io/name: dc-crawler-worker
       image: {{ index .Values.images "dcinside-crawler" }}
       replicas: 8
       distribute: false
@@ -51,8 +54,8 @@ releases:
 {{ toYaml .Values.nodeSelectors.crawler | indent 8 }}
       resources:
         requests:
-          memory: "10Mi"
-          cpu: "10m"
+          memory: "50Mi"
+          cpu: "50m"
     liveDirectory:
       image: {{ index .Values.images "dcinside-crawler" }}
       nodeSelector:
@@ -63,6 +66,7 @@ releases:
       #    memory: "100Mi"
       #    cpu: "20m"
 - name: dcinside-crawler-minor
+  installed: false
   chart: charts/dcinside-crawler
   values:
   - dataBroker:
@@ -75,6 +79,8 @@ releases:
         #  memory: "100Mi"
         #  cpu: "50m"
     worker:
+      labels: 
+        app.kubernetes.io/name: dc-crawler-worker
       image: {{ index .Values.images "dcinside-crawler" }}
       replicas: 8
       distribute: false
@@ -101,9 +107,9 @@ releases:
   - image: {{ index .Values.images "crawler-node-rotator" }}
     nodeSelector: 
 {{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
-    lifetimeMin: 60
-    podLabel: "app=dc-crawler-worker"
-    maxNodeCount: 4
+    lifetimeMin: 120
+    podLabel: "app.kubernetes.io/name=dc-crawler-worker"
+    maxNodeCount: 8
 - name: argo
   chart: argo/argo
   version: 0.15.2

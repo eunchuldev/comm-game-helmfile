@@ -6,6 +6,7 @@ worker:
   resources: {}
   distribute: true
   delay: 400
+  labels: {}
   sleepDuration: 60000
 liveDirectory:
   image:
