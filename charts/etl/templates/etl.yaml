@@ -28,6 +28,8 @@ spec:
                     value: {{`gs://datalake-cg/datalake/json/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
                   - name: orcPath
                     value: {{`gs://datalake-cg/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
+                  - name: referenceOrcPath
+                    value: {{`gs://datalake-cg/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.prev_date}}/`}}
             - name: dcinside-parlai-dataset
               templateRef:
                 name: parlai-dataset

@@ -13,9 +13,11 @@ spec:
           - -c
           - >-
             hoursago="$(( $(date +%s) - 3600 ))" &&
+            hhoursago="$(( $(date +%s) - 7200 ))" &&
             date -D %s +"%H" -u -d "$hoursago" > /tmp/hour && 
             date -D %s +"%F" -u -d "$hoursago" > /tmp/date && 
             date -D %s +'%FT%H:00:00Z' -u -d "$hoursago" > /tmp/timestamp
+            date -D %s +'%FT%H:00:00Z' -u -d "$hhoursago" > /tmp/prev_timestamp
       outputs:
         parameters:
         - name: hour
@@ -36,13 +38,23 @@ spec:
           - -c
           - >-
             daysago="$(( $(date +%s) - 24*3600 ))" &&
+            ddaysago="$(( $(date +%s) - 48*3600 ))" &&
             date -D %s +"%F" -u -d "$daysago" > /tmp/date && 
-            date -D %s +'%FT00:00:00Z' -u -d "$daysago" > /tmp/timestamp
+            date -D %s +"%F" -u -d "$ddaysago" > /tmp/prev_date && 
+            date -D %s +'%FT00:00:00Z' -u -d "$daysago" > /tmp/timestamp &&
+            date -D %s +'%FT00:00:00Z' -u -d "$ddaysago" > /tmp/prev_timestamp
       outputs:
         parameters:
         - name: date
           valueFrom:
             path: /tmp/date
+        - name: prev_date
+          valueFrom:
+            path: /tmp/prev_date
+            default: ""
         - name: timestamp
           valueFrom:
             path: /tmp/timestamp
+        - name: prev_timestamp
+          valueFrom:
+            path: /tmp/prev_timestamp

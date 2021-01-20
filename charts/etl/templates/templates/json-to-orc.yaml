@@ -11,6 +11,8 @@ spec:
           - name: orcPath
           - name: timestampColumn
             value: created_at
+          - name: referenceOrcPath
+            value: ""
       volumes:
       - name: data-access-secrets
         secret:
@@ -36,9 +38,14 @@ spec:
           json_path = "{{`{{inputs.parameters.jsonPath}}`}}"
           orc_path = "{{`{{inputs.parameters.orcPath}}`}}"
           timestamp_column = "{{`{{inputs.parameters.timestampColumn}}`}}"
+          reference_orc_path= "{{`{{inputs.parameters.referenceOrcPath}}`}}"
           from pyspark.sql import SparkSession, types as T, functions as F, Row
           spark = (SparkSession.builder.master('local').getOrCreate())
-          df = spark.read.format('json').load(json_path)
+          if reference_orc_path:
+              reference_df = spark.read.format('orc').load(reference_orc_path)
+              df = spark.read.format('json').schema(reference_df.schema).load(json_path)
+          else:
+              df = spark.read.format('json').load(json_path)
           def _bulk_cast(schema, name, type):
               if schema.get('name') == name: schema['type'] = type
               if isinstance(schema.get('type'), dict): _bulk_cast(schema['type'], name, type)

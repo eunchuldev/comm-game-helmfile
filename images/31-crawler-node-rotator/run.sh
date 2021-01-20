@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 max_node_count="${MAX_NODE_COUNT:-1000}"
@@ -22,8 +22,8 @@ if [ -z "$nodes" ]; then
   exit 0
 fi
 
-node_max_cpu="$(kubectl get node -l cloud.google.com/gke-nodepool=crawler-pool --sort-by=.metadata.creationTimestamp -o=jsonpath='{.items[0].status.allocatable.cpu}')"
-node_max_memory="$(kubectl get node -l cloud.google.com/gke-nodepool=crawler-pool --sort-by=.metadata.creationTimestamp -o=jsonpath='{.items[0].status.allocatable.memory}')"
+node_max_cpu="$(kubectl get node -l $node_selector  --sort-by=.metadata.creationTimestamp -o=jsonpath='{.items[0].status.allocatable.cpu}')"
+node_max_memory="$(kubectl get node -l $node_selector --sort-by=.metadata.creationTimestamp -o=jsonpath='{.items[0].status.allocatable.memory}')"
 cat >dummy-pod.yaml <<EOF
 apiVersion: v1
 kind: Pod

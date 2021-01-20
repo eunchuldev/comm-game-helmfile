@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: json-to-orc-backfill
+spec:
+  entrypoint: main
+  # limit to one job at a time
+  parallelism: 1
+  templates:
+    - name: main
+      steps:
+        - - name: dcinside-json-to-orc
+            templateRef:
+              name: json-to-orc
+              template: json-to-orc
+            arguments:
+              parameters:
+                - name: jsonPath
+                  value: "gs://datalake-cg/datalake/json/dcinside/document/date={{item}}/"
+                - name: orcPath
+                  value: "gs://datalake-cg/datalake/orc/dcinside/document/date={{item}}/"
+                - name: referenceOrcPath
+                  value: gs://datalake-cg/datalake/orc/dcinside/document/date=2021-01-18/
+            withSequence:
+              # run for the 19th to the 21st
+              start: "16"
+              end: "17"
+              format: "2021-01-%02d"
