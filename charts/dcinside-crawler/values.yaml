@@ -4,7 +4,7 @@ worker:
   nodeSelector:
     cloud.google.com/gke-nodepool: pvm-g1-small-pool
   resources: {}
-  distribute: true
+  distribute: false
   delay: 400
   labels: {}
   sleepDuration: 60000

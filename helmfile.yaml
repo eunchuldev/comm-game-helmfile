@@ -54,8 +54,8 @@ releases:
 {{ toYaml .Values.nodeSelectors.crawler | indent 8 }}
       resources:
         requests:
-          memory: "50Mi"
-          cpu: "50m"
+          memory: "40Mi"
+          cpu: "40m"
     liveDirectory:
       image: {{ index .Values.images "dcinside-crawler" }}
       nodeSelector:
