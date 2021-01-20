@@ -7,12 +7,12 @@ node_lifetime_min="${NODE_LIFETIME_MIN:-60}"
 
 pod_label="${POD_LABEL:-app=dc-crawler-worker}"
 
-node_pool="${NODE_POOL:-crawler-pool}"
+node_selector="${NODE_SELECTOR:-cloud.google.com/gke-nodepool=crawler-pool}"
 
 min_node_creation_time="$(date --date="-${node_lifetime_min}min" -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 nodes="$(kubectl get node \
-  -l cloud.google.com/gke-nodepool=$node_pool \
+  -l $node_selector \
   --sort-by=.metadata.creationTimestamp \
   -o=jsonpath="{range .items[?(@.metadata.creationTimestamp < '${min_node_creation_time}')]}{.metadata.name}{'\n'}{end}")"
 

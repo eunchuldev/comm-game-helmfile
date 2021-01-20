@@ -65,8 +65,8 @@ spec:
             image: {{ .Values.image }}
             imagePullPolicy: IfNotPresent
             env:
-              - name: NODE_POOL
-                value: {{ .Values.nodePool | quote }}
+              - name: NODE_SELECTOR
+                value: {{ range $key, $value := .Values.nodeSelector -}} {{$key}}={{$value}} {{- end }}
               - name: NODE_LIFETIME_MIN
                 value: {{ .Values.lifetimeMin | quote }}
               - name: POD_LABEL

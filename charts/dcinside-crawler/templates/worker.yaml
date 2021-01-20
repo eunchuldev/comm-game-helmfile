@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: dc-crawler-worker
+  name: dc-crawler-worker-{{ .Values.liveDirectory.galleryKind }}
   labels:
-    app: dc-crawler-worker
+    app: dc-crawler-worker-{{ .Values.liveDirectory.galleryKind }}
 spec:
   podManagementPolicy: Parallel
   replicas: {{ .Values.worker.replicas }}
   selector:
     matchLabels:
-      app: dc-crawler-worker
-  serviceName: dc-crawler-worker
+      app: dc-crawler-worker-{{ .Values.liveDirectory.galleryKind }}
+  serviceName: dc-crawler-worker-{{ .Values.liveDirectory.galleryKind }}
   template:
     metadata:
       labels:
-        app: dc-crawler-worker
+        app: dc-crawler-worker-{{ .Values.liveDirectory.galleryKind }}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '8080'
@@ -24,11 +24,11 @@ spec:
         image: {{ .Values.worker.image }}
         env:
         - name: LIVE_DIRECTORY_URL
-          value: "http://dc-crawler-live-dir:8080"
+          value: "http://dc-crawler-live-dir-{{ .Values.liveDirectory.galleryKind }}:8080"
         - name: TOTAL
           value: {{ .Values.worker.replicas | quote }}
         - name: DATA_BROKER_URL
-          value: "http://dc-crawler-data-broker:8080"
+          value: "http://dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}:8080"
         - name: DELAY
           value: {{ .Values.worker.delay | quote }}
         - name: SLEEP_DURATION
@@ -54,7 +54,7 @@ spec:
                 matchExpressions:
                 - key: "app"
                   operator: In
-                  values: [ "dc-crawler-worker" ]
+                  values: [ "dc-crawler-worker-{{ .Values.liveDirectory.galleryKind }}" ]
               topologyKey: "kubernetes.io/hostname"
         {{- end }}
 
@@ -64,12 +64,12 @@ apiVersion: "v1"
 kind: "Service"
 metadata:
   labels:
-    app: dc-crawler-worker
-  name: dc-crawler-worker
+    app: dc-crawler-worker-{{ .Values.liveDirectory.galleryKind }}
+  name: dc-crawler-worker-{{ .Values.liveDirectory.galleryKind }}
 spec:
   ports:
     - port: 8080
   selector:
-    app: dc-crawler-worker
+    app: dc-crawler-worker-{{ .Values.liveDirectory.galleryKind }}
   type: ClusterIP
   clusterIP: None

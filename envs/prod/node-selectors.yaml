@@ -1,0 +1,9 @@
+nodeSelectors:
+  etl: 
+    cloud.google.com/gke-nodepool: etl-pool
+  crawler:
+    cloud.google.com/gke-nodepool: crawler-pool
+  system:
+    cloud.google.com/gke-nodepool: default-pool
+  alwaysOn:
+    cloud.google.com/gke-nodepool: default-pool

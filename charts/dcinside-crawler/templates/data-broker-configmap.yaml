@@ -16,4 +16,4 @@ data:
     type = "http"
 kind: "ConfigMap"
 metadata:
-  name: "dc-crawler-data-broker"
+  name: dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}

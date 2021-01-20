@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: etl-backfill
+spec:
+  entrypoint: main
+  # limit to one job at a time
+  parallelism: 1
+  templates:
+    - name: main
+      steps:
+        - - name: dcinside-parlai-dataset
+            templateRef:
+              name: parlai-dataset
+              template: dcinside
+            arguments:
+              parameters:
+                - name: inputPath
+                  value: "gs://datalake-cg/datalake/orc/dcinside/document/date={{item}}/"
+                - name: format
+                  value: orc
+                - name: outputPath
+                  value: "gs://datalake-cg/datalake/parlai/dcinside/document/date={{item}}/"
+            withSequence:
+              # run for the 19th to the 21st
+              start: "16"
+              end: "17"
+              format: "2021-01-%02d"

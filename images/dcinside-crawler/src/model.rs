@@ -350,6 +350,19 @@ mod tests {
         }));
     }
     #[test]
+    fn it_parses_minor_document_indexes(){
+        let res = parse_document_indexes(include_str!("../assets/minor_gallery.html"), "gallery_id").unwrap();
+        let res: Vec<_> = res.into_iter().map(|d| d.unwrap()).collect();
+        assert!(!res.is_empty());
+        assert!(res.len() >= 20);
+        assert!(res.iter().any(|d| d.comment_count > 0));
+        assert!(res.iter().any(|d| if DocumentKind::Picture == d.kind {
+            true
+        } else {
+            false
+        }));
+    }
+    #[test]
     fn it_parses_comments() {
         let (res, max_page) = parse_comments(include_str!("../assets/comments.json"), "gallery_id", 1, None).unwrap();
         assert!(!res.is_empty());
@@ -369,6 +382,15 @@ mod tests {
         assert_eq!(expected, res);
         //assert_eq!(!res[0], Comment{});
     }
+    #[test]
+    fn it_deserializes_minor_comments() {
+        let (res, max_page) = parse_comments(include_str!("../assets/minor_comments.json"), "gallery_id", 1, None).unwrap();
+        let res = serde_json::to_string(&res[0]).unwrap();
+        let expected = "{\"id\":4649463,\"author\":{\"id\":\"nasdaqtrader\",\"nickname\":\"오함마의현인.\",\"ip\":null},\"depth\":0,\"contents\":\"개추\",\"parent_id\":null,\"created_at\":\"2020-12-31T07:44:47Z\"}".to_string();
+        assert_eq!(expected, res);
+        //assert_eq!(!res[0], Comment{});
+    }
+
     #[test]
     fn it_parses_document_body() {
         let res = parse_document_body(include_str!("../assets/body.html"), "gallery_id", 1).unwrap();

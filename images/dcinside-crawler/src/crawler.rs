@@ -277,7 +277,11 @@ impl<'a> Crawler {
             comment_page: page,
             sort: if page == 1 { "" } else { "D" },
             prevCnt: 0,
-            _GALLTYPE_: "G",
+            _GALLTYPE_: match gallery.kind {
+               GalleryKind::Major => "G",
+               GalleryKind::Minor => "M",
+               _ => panic!("other than major, minor gallery is not supported yet"),
+            }
         };
         Ok(back_off(1000, 1000*10, || async {
             let bytes = self
@@ -312,7 +316,7 @@ impl<'a> Crawler {
                 "{}/mgallery/board/lists?id={}&list_num=100&page={}",
                 self.host, gallery.id, page
             ),
-            _ => panic!("What's this?"),
+            _ => panic!("mini gallery kind not supported yet"),
         };
         let (e_s_n_o, res) = back_off(1000, 1000*10, || async {
             let bytes = self
@@ -384,6 +388,25 @@ mod tests {
         }, Err(_) => false }));
     }
     #[actix_rt::test]
+    async fn minor_document_indexes() {
+        let mut crawler = Crawler::new();
+        let gallery = GalleryIndex {
+            id: String::from("tenbagger"),
+            name: String::from("해외주식"),
+            kind: GalleryKind::Minor,
+            rank: None,
+        };
+        let res = crawler.document_indexes(&gallery, 1).await.unwrap();
+        assert!(!res.is_empty());
+        assert!(res.len() >= 90);
+        assert!(res.iter().any(|d| match d { Ok(d) => d.comment_count > 0, Err(_) => false}));
+        assert!(res.iter().any(|d| match d { Ok(d) => if DocumentKind::Picture == d.kind {
+            true
+        } else {
+            false
+        }, Err(_) => false }));
+    }
+    #[actix_rt::test]
     async fn comments() {
         let mut crawler = Crawler::new();
         let gallery = GalleryIndex {
@@ -409,6 +432,31 @@ mod tests {
         }));*/
     }
     #[actix_rt::test]
+    async fn minor_comments() {
+        let mut crawler = Crawler::new();
+        let gallery = GalleryIndex {
+            id: String::from("tenbagger"),
+            name: String::from("해외주식"),
+            kind: GalleryKind::Minor,
+            rank: None,
+        };
+        let res = crawler.comments(&gallery, 1962073).await.unwrap();
+        assert!(!res.is_empty());
+        assert!(res.len() >= 1);
+        assert!(!res.iter().any(|c| match &c.author {
+            User::Static { id, ..  } => id.is_empty(),
+            User::Dynamic { ip, .. } => ip.is_empty(),
+            _ => false,
+        }));
+        /*assert!(res.iter().any(|c| d.comment_count > 0));
+        assert!(res.iter().any(|c| if DocumentKind::Picture == d.kind {
+            true
+        } else {
+            false
+        }));*/
+    }
+    /*
+    #[actix_rt::test]
     async fn documents() {
         let mut crawler = Crawler::new();
         let gallery = GalleryIndex {
@@ -430,4 +478,5 @@ mod tests {
             false
         }));*/
     }
+    */
 }

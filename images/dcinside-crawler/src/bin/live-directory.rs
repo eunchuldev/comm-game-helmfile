@@ -53,26 +53,33 @@ where T: Hash,
 struct State {
     crawler: Crawler,
     gallery_db: sled::Tree,
+    gallery_kind: GalleryKind,
 }
 
 impl State {
-    fn new() -> Self {
+    fn new(gallery_kind: GalleryKind) -> Self {
         let config = sled::Config::new().temporary(true);
         let db = config.open().unwrap().open_tree("galleries").unwrap();
         State {
             crawler: Crawler::new(),
             gallery_db: db,
+            gallery_kind,
         }
     }
-    fn with_db(db: sled::Tree) -> Self {
+    fn with_db(db: sled::Tree, gallery_kind: GalleryKind) -> Self {
         State {
             crawler: Crawler::new(),
             gallery_db: db,
+            gallery_kind,
         }
     }
     async fn update(&self) -> Result<(), LiveDirectoryError> {
         let now = Utc::now();
-        let hot_galleries = self.crawler.realtime_hot_galleries().await?;
+        let hot_galleries = match self.gallery_kind {
+            GalleryKind::Major => self.crawler.realtime_hot_galleries().await?,
+            GalleryKind::Minor => self.crawler.realtime_hot_minor_galleries().await?,
+            GalleryKind::Mini => panic!("mini gallery kind not supported yet"),
+        };
         for index in hot_galleries {
             let new_state = GalleryState {
                 index,
@@ -177,6 +184,12 @@ async fn main() -> std::io::Result<()> {
 
     let port = std::env::var("PORT").unwrap_or("8080".to_string());
     let store_path = std::env::var("STORE_PATH").unwrap_or("".to_string());
+    let gallery_kind = match std::env::var("GALLERY_KIND").unwrap_or("major".to_string()).as_ref() {
+        "major" => GalleryKind::Major,
+        "minor" => GalleryKind::Minor,
+        "mini" => GalleryKind::Mini,
+        _ => panic!("unsupported gallery kind"),
+    };
 
     let prometheus = PrometheusMetrics::new("api", Some("/metrics"), None);
     let counter = IntGauge::new("major_gallery_count", "major_gallery_count").unwrap();
@@ -196,7 +209,7 @@ async fn main() -> std::io::Result<()> {
     let db2 = db.clone();
     actix_rt::spawn(async move {
         loop {
-            let state = State::with_db(db2.clone());
+            let state = State::with_db(db2.clone(), gallery_kind);
             let res = update_forever(state, Duration::from_secs(60), counter.clone()).await; 
             if let Err(e) = res {
                 error!("updator restart due to: {}", e.to_string());
@@ -204,7 +217,7 @@ async fn main() -> std::io::Result<()> {
         }
     });
     HttpServer::new(move || {
-        let state = State::with_db(db.clone());
+        let state = State::with_db(db.clone(), gallery_kind);
         App::new()
             .wrap(prometheus.clone())
             .app_data(web::Data::new(state))
@@ -223,8 +236,21 @@ mod tests {
     use actix_web::{body::Body, test, web, App, http};
 
     #[actix_rt::test]
+    async fn state_update_minor_list_part() {
+        let state = State::new(GalleryKind::Minor);
+        state.update().await.unwrap();
+        let res1 = state.list_part(2, 0);
+        let res2 = state.list_part(2, 1);
+        assert!(res1.len() > 0);
+        assert!(res2.len() > 0);
+        let mut h = std::collections::HashSet::new();
+        for t in res1.iter() { h.insert(t.index.id.clone()); }
+        for t in res2.iter() { h.insert(t.index.id.clone()); }
+        assert_eq!(h.len(), res1.len() + res2.len());
+    }
+    #[actix_rt::test]
     async fn state_update_list_part() {
-        let state = State::new();
+        let state = State::new(GalleryKind::Major);
         state.update().await.unwrap();
         let res1 = state.list_part(2, 0);
         let res2 = state.list_part(2, 1);
@@ -237,7 +263,7 @@ mod tests {
     }
     #[actix_rt::test]
     async fn state_report() {
-        let state = State::new();
+        let state = State::new(GalleryKind::Major);
         state.update().await.unwrap();
         let res1 = state.list_part(2, 0);
         assert!(res1[0].last_crawled_at.is_none());

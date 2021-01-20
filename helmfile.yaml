@@ -1,5 +1,5 @@
 environments:
-  dev:
+  prod:
     secrets:
     - "envs/{{ .Environment.Name }}/data-access-secrets.yaml"
     - "envs/{{ .Environment.Name }}/secrets.yaml"
@@ -7,6 +7,7 @@ environments:
     - "envs/values.yaml"
     - "envs/{{ .Environment.Name }}/values.yaml.gotmpl"
     - "envs/{{ .Environment.Name }}/images.yaml"
+    - "envs/{{ .Environment.Name }}/node-selectors.yaml"
 
 repositories:
 - name: argo
@@ -20,7 +21,7 @@ helmDefaults:
   kubeContext: {{ requiredEnv "KUBE_CONTEXT" }}
 
 commonLabels:
-  apps: cg
+  apps: comm-game
 
 releases:
 - name: data-access-secrets
@@ -28,14 +29,14 @@ releases:
   values:
   - secrets: 
 {{ toYaml .Values.dataAccessSecrets | indent 6 }}
-- name: dcinside-crawler
+- name: dcinside-crawler-major
   chart: charts/dcinside-crawler
   values:
   - dataBroker:
-      bucket: datalake-cg
+      bucket: comm-game
       prefix: datalake/json/dcinside/document/
-      nodeSelector:
-        cloud.google.com/gke-nodepool: default-pool
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
       #resources:
         #requests:
         #  memory: "100Mi"
@@ -46,8 +47,8 @@ releases:
       distribute: false
       delay: 200
       sleepDuration: 60000
-      nodeSelector:
-        cloud.google.com/gke-nodepool: crawler-pool
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.crawler | indent 8 }}
       resources:
         requests:
           memory: "10Mi"
@@ -55,7 +56,41 @@ releases:
     liveDirectory:
       image: {{ index .Values.images "dcinside-crawler" }}
       nodeSelector:
-        cloud.google.com/gke-nodepool: default-pool
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      galleryKind: major
+      #resources:
+      #  requests:
+      #    memory: "100Mi"
+      #    cpu: "20m"
+- name: dcinside-crawler-minor
+  chart: charts/dcinside-crawler
+  values:
+  - dataBroker:
+      bucket: comm-game
+      prefix: datalake/json/dcinside/document/
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      #resources:
+        #requests:
+        #  memory: "100Mi"
+        #  cpu: "50m"
+    worker:
+      image: {{ index .Values.images "dcinside-crawler" }}
+      replicas: 8
+      distribute: false
+      delay: 200
+      sleepDuration: 60000
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.crawler | indent 8 }}
+      resources:
+        requests:
+          memory: "10Mi"
+          cpu: "10m"
+    liveDirectory:
+      image: {{ index .Values.images "dcinside-crawler" }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      galleryKind: minor
       #resources:
       #  requests:
       #    memory: "100Mi"
@@ -64,7 +99,8 @@ releases:
   chart: charts/crawler-node-rotator
   values:
   - image: {{ index .Values.images "crawler-node-rotator" }}
-    nodePool: crawler-pool
+    nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
     lifetimeMin: 60
     podLabel: "app=dc-crawler-worker"
     maxNodeCount: 4
@@ -78,14 +114,14 @@ releases:
   - artifactRepository:
       archiveLogs: true
       gcs:
-        bucket: datalake-cg
+        bucket: comm-game
         keyFormat: argo/artifacts/
         serviceAccountKeySecret:
           name: data-access
           key: "service-account.json"
   - server:
-      nodeSelector:
-        cloud.google.com/gke-nodepool: default-pool
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
   - controller:
       workflowDefaults:
         spec:
@@ -95,8 +131,8 @@ releases:
             secret: 
               secretName: 'data-access'
               defaultMode: 256
-      nodeSelector:
-        cloud.google.com/gke-nodepool: default-pool
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
 - name: argo-suppliment
   chart: charts/argo-suppliment
   values:
@@ -111,13 +147,13 @@ releases:
     extraEnv:
       SPARK_EXTRA_CONFIGS: |
         spark.kubernetes.executor.secrets.data-access=/run/data-access/
-    nodeSelector:
-      cloud.google.com/gke-nodepool: default-pool
+    nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
     spark:
       executor:
         image: {{ index .Values.images "spark" }}
-        nodeSelector:
-          cloud.google.com/gke-nodepool: etl-pool
+        nodeSelector: 
+{{ toYaml .Values.nodeSelectors.etl | indent 10 }}
     service:
       type: NodePort
       nodePort: 30001
@@ -131,5 +167,5 @@ releases:
   values:
   - images:
 {{ toYaml .Values.images | indent 6 }}
-    nodeSelector:
-      cloud.google.com/gke-nodepool: etl-pool
+    nodeSelector: 
+{{ toYaml .Values.nodeSelectors.etl | indent 6 }}

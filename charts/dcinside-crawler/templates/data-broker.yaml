@@ -2,17 +2,17 @@ apiVersion: "apps/v1"
 kind: "Deployment"
 metadata:
   labels:
-    app: dc-crawler-data-broker
-  name: dc-crawler-data-broker
+    app: dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}
+  name: dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: dc-crawler-data-broker
+      app: dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}
   template:
     metadata:
       labels:
-        app: dc-crawler-data-broker
+        app: dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}
       annotations:
         configHash: {{ include (print $.Template.BasePath "/data-broker-configmap.yaml") . | sha256sum }}
     spec:
@@ -40,7 +40,7 @@ spec:
       volumes:
         - name: dc-crawler-data-broker 
           configMap:
-            name: dc-crawler-data-broker
+            name: dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}
         - name: data-access
           secret:
             secretName: data-access
@@ -53,11 +53,11 @@ apiVersion: "v1"
 kind: "Service"
 metadata:
   labels:
-    app: dc-crawler-data-broker
-  name: dc-crawler-data-broker
+    app: dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}
+  name: dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}
 spec:
   ports:
     - port: 8080
   selector:
-    app: dc-crawler-data-broker
+    app: dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}
   type: "ClusterIP"

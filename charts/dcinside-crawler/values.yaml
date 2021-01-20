@@ -9,6 +9,7 @@ worker:
   sleepDuration: 60000
 liveDirectory:
   image:
+  galleryKind: major
   nodeSelector:
     cloud.google.com/gke-nodepool: default-pool
   resources: {}
