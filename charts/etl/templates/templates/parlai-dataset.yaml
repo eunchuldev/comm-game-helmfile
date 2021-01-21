@@ -49,23 +49,26 @@ spec:
           from pyspark.sql.window import Window
           spark = (SparkSession.builder
             .appName('parlai-dataset-dcinside')
+            .master('local')
             .getOrCreate())
           df = spark.read.format(format).load(input_path)
           def dccon_parse(df, col):
               return df.withColumn(col, F.when(
                   F.col(col).startswith('<video'),
                   F.concat(
-                      F.lit('<dccon> '),
+                      F.lit('<dccon '),
                       F.regexp_extract(col, r'data-src="[^?]*\?no=([^"]+)"', 1),
                       F.lit(' '),
-                      F.regexp_extract(col, r'title="([^"]*)"', 1))
+                      F.regexp_extract(col, r'title="([^"]*)"', 1)),
+                      F.lit('>'),
               ).when(
                   F.col(col).startswith('<img'),
                   F.concat(
-                      F.lit('<dccon> '),
+                      F.lit('<dccon '),
                       F.regexp_extract(col, r'src="[^?]*\?no=([^"]+)"', 1),
                       F.lit(' '),
-                      F.regexp_extract(col, r'title="([^"]*)"', 1))
+                      F.regexp_extract(col, r'title="([^"]*)"', 1)),
+                      F.lit('>'),
               ).otherwise(F.col(col)))
 
           d2c_df = df.selectExpr('gallery_id', 'title', 'author', 'EXPLODE(comments) as comment')
@@ -76,7 +79,7 @@ spec:
           d2c_df = d2c_df.withColumn('title', F.regexp_replace('title', r'[\s\n\t]+', ' '))
           d2c_df = d2c_df.withColumn('comment', F.regexp_replace('comment', r'[\s\n\t]+', ' '))
           d2c_df = dccon_parse(d2c_df, 'comment')
-          d2c_df = d2c_df.selectExpr('''CONCAT("text:", gallery_id, "¶", title, '\t',
+          d2c_df = d2c_df.selectExpr('''CONCAT("text:", "<", gallery_id, ">", title, '\t',
                                         'labels:', comment, '\t', "episode_done:True") AS episode ''')
           d2c_df = d2c_df.distinct()
 
@@ -101,7 +104,7 @@ spec:
                   F.concat_ws(". ", F.collect_list('contents')).alias('contents'),
                   F.first('created_at').alias('created_at'))\
               .withColumn('contents', F.concat(
-                  F.when(F.col('is_root_author'), F.lit('text:')).otherwise(F.lit('labels:')),
+                  F.when(F.col('is_root_author'), F.concat(F.lit('text:'), F.lit('<'), 'gallery_id', F.lit('>')).otherwise(F.lit('labels:')),
                   'contents'))
           c2c_df = c2c_df\
               .groupBy('gallery_id', 'document_id', 'root_id').agg(

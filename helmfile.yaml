@@ -106,7 +106,7 @@ releases:
   values:
   - image: {{ index .Values.images "crawler-node-rotator" }}
     nodeSelector: 
-{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+{{ toYaml .Values.nodeSelectors.crawler | indent 6 }}
     lifetimeMin: 120
     podLabel: "app.kubernetes.io/name=dc-crawler-worker"
     maxNodeCount: 8
