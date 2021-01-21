@@ -65,7 +65,7 @@ for node in $nodes; do
   kubectl wait --for=condition=ready --timeout=24h pod -l="$pod_label"
   echo ""
   echo "4. wait until node deleted(might takes 10~30mins)"
-  until kubectl get node $node 2>&1 >/dev/null; do sleep 10; do
+  until kubectl get node $node 2>&1 >/dev/null; do sleep 10; done
 done
 for node in $nodes; do
   set +e

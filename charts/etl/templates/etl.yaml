@@ -25,11 +25,11 @@ spec:
               arguments:
                 parameters:
                   - name: jsonPath
-                    value: {{`gs://datalake-cg/datalake/json/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
+                    value: {{`gs://comm-game/datalake/json/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
                   - name: orcPath
-                    value: {{`gs://datalake-cg/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
+                    value: {{`gs://comm-game/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
                   - name: referenceOrcPath
-                    value: {{`gs://datalake-cg/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.prev_date}}/`}}
+                    value: gs://comm-game/datalake/orc/dcinside/document/date=2021-01-16
             - name: dcinside-parlai-dataset
               templateRef:
                 name: parlai-dataset
@@ -38,8 +38,8 @@ spec:
               arguments:
                 parameters:
                   - name: inputPath
-                    value: {{`gs://datalake-cg/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
+                    value: {{`gs://comm-game/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
                   - name: format
                     value: orc
                   - name: outputPath
-                    value: {{`gs://datalake-cg/datalake/parlai/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
+                    value: {{`gs://comm-game/datalake/parlai/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
