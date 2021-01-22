@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  name: etl-backfill
+  name: parlai-backfill
 spec:
   entrypoint: main
   # limit to one job at a time
@@ -16,13 +16,13 @@ spec:
             arguments:
               parameters:
                 - name: inputPath
-                  value: "gs://datalake-cg/datalake/orc/dcinside/document/date={{item}}/"
+                  value: "gs://comm-game/datalake/orc/dcinside/document/date={{item}}/"
                 - name: format
                   value: orc
                 - name: outputPath
-                  value: "gs://datalake-cg/datalake/parlai/dcinside/document/date={{item}}/"
+                  value: "gs://comm-game/datalake/parlai/dcinside/document/date={{item}}/"
             withSequence:
               # run for the 19th to the 21st
               start: "16"
-              end: "20"
+              end: "21"
               format: "2021-01-%02d"

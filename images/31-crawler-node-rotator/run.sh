@@ -59,7 +59,8 @@ for node in $nodes; do
   echo ""
   echo "2. scale up done. remove dummy pod"
   kubectl delete pod -l="role=dummy" --wait=true
-  echo ""
+  echo "sleep few 15 seconds.."
+  sleep 15
   echo "3. drain expired node. wait until all crawlers ready"
   kubectl drain --delete-local-data --ignore-daemonsets --force "$node"
   kubectl wait --for=condition=ready --timeout=24h pod -l="$pod_label"
