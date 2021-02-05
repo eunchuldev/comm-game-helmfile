@@ -11,6 +11,8 @@ spec:
           - name: format
             value: orc
           - name: outputPath
+          - name: skipNonText
+            value: "false"
       volumes:
       - name: data-access-secrets
         secret:
@@ -44,6 +46,7 @@ spec:
           input_path = "{{`{{inputs.parameters.inputPath}}`}}"
           format = "{{`{{inputs.parameters.format}}`}}"
           output_path = "{{`{{inputs.parameters.outputPath}}`}}"
+          skip_non_text = "{{`{{inputs.parameters.skipNonText}}`}}"
           import datetime
           from pyspark.sql import SparkSession, types as T, functions as F, Row
           from pyspark.sql.window import Window
@@ -70,6 +73,8 @@ spec:
                       F.regexp_extract(col, r'title="([^"]*)"', 1),
                       F.lit('>')),
               ).otherwise(F.col(col)))
+          def filter_non_text(df, col):
+              return df.filter(~F.col(col).startswith('<'))
 
           d2c_df = df.selectExpr('gallery_id', 'title', 'author', 'EXPLODE(comments) as comment')
           d2c_df = d2c_df.selectExpr('gallery_id', 'title', 'author', 'comment.contents as comment', 'comment.author as comm_author')\
@@ -78,7 +83,10 @@ spec:
           d2c_df = d2c_df.filter((~F.col('comment').startswith('<div')) & (~F.col('comment').isNull()))
           d2c_df = d2c_df.withColumn('title', F.regexp_replace('title', r'[\s\n\t]+', ' '))
           d2c_df = d2c_df.withColumn('comment', F.regexp_replace('comment', r'[\s\n\t]+', ' '))
-          d2c_df = dccon_parse(d2c_df, 'comment')
+          if skip_non_text.upper() == 'TRUE':
+              d2c_df = filter_non_text(d2c_df, 'comment')
+          else:
+              d2c_df = dccon_parse(d2c_df, 'comment')
           d2c_df = d2c_df.selectExpr('''CONCAT("text:", "<gallery ", gallery_id, ">", title, '\t',
                                         'labels:', comment, '\t', "episode_done:True") AS episode ''')
           d2c_df = d2c_df.distinct()
@@ -93,7 +101,10 @@ spec:
           window = Window.partitionBy('gallery_id', 'document_id', 'root_id').orderBy('created_at')
           c2c_df = c2c_df.withColumn('dialog_size', F.count('*').over(Window.partitionBy('gallery_id', 'document_id', 'root_id'))).filter(F.col('dialog_size') > 1)
           c2c_df = c2c_df.withColumn('contents', F.regexp_replace('contents', r'[\s\n\t]+', ' '))
-          c2c_df = dccon_parse(c2c_df, 'contents')
+          if skip_non_text.upper() == 'TRUE':
+              c2c_df = filter_non_text(c2c_df, 'contents')
+          else:
+              c2c_df = dccon_parse(c2c_df, 'contents')
           c2c_df = c2c_df.withColumn('is_root_author', F.first(F.col('author')).over(window) == F.col('author'))
           c2c_df = c2c_df.withColumn('is_document_author', F.col('author') == F.col('document_author'))
           c2c_df = c2c_df.withColumn(
