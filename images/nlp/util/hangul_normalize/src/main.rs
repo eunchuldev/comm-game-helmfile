@@ -2,24 +2,26 @@ use derive_more::From;
 use clap::Clap;
 use std::{
     fs::File,
-    io::{Read, Write, BufReader, LineWriter, stdin, stdout, Stdout, BufRead},
+    io::{Read, Write, BufReader, stdin, stdout, Stdout, BufRead},
 };
 
 mod lib;
+mod py;
 
 use lib::*;
+use py::*;
 
 
 #[derive(From)]
 enum Writer {
-    File(LineWriter<File>),
-    Stdout(LineWriter<Stdout>),
+    File(File),
+    Stdout(Stdout),
 }
 impl Writer {
-    fn write_all(&mut self, text: String) -> anyhow::Result<()>{
+    fn write_all(&mut self, text: &[u8]) -> anyhow::Result<()>{
         match self {
-            Writer::File(writer) => writer.write_all(text.as_bytes()),
-            Writer::Stdout(writer) => writer.write_all(text.as_bytes()),
+            Writer::File(writer) => writer.write_all(text),
+            Writer::Stdout(writer) => writer.write_all(text),
         }?;
         Ok(())
     }
@@ -29,21 +31,22 @@ fn main() -> anyhow::Result<()> {
     let opts: Opts = Opts::parse();
     let mut writer: Writer = if let Some(output_file_path) = &opts.output_file_path {
         let file = File::create(&output_file_path)?;
-        LineWriter::new(file).into()
+        file.into()
     } else {
-        LineWriter::new(stdout()).into()
+        stdout().into()
     };
     if let Some(input_file_path) = &opts.input_file_path {
         let file = File::open(&input_file_path)?;
         let reader = BufReader::new(file);
         for line in reader.lines() {
             let line = line?;
-            writer.write_all(normalize(line, &opts))?;
+            writer.write_all(normalize(line, &opts).as_bytes())?;
+            writer.write_all(b"\n")?;
         }
     } else {
         let mut buffer = String::new();
         stdin().read_to_string(&mut buffer)?;
-        writer.write_all(normalize(buffer, &opts))?;
+        writer.write_all(normalize(buffer, &opts).as_bytes())?;
     };
     Ok(())
 }

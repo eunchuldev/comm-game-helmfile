@@ -1,0 +1,7 @@
+setup.py
+hangul_normalize/__init__.py
+hangul_normalize.egg-info/PKG-INFO
+hangul_normalize.egg-info/SOURCES.txt
+hangul_normalize.egg-info/dependency_links.txt
+hangul_normalize.egg-info/not-zip-safe
+hangul_normalize.egg-info/top_level.txt

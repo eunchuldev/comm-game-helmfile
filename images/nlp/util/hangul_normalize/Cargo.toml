@@ -1,5 +1,5 @@
 [package]
-name = "norm"
+name = "hangul_normalize"
 version = "0.1.0"
 authors = ["Eunchul <eunchul.dev@gmail.com>"]
 edition = "2018"
@@ -12,3 +12,11 @@ anyhow = "*"
 regex = "*"
 lazy_static = "*"
 derive_more = "0.99"
+
+[py]
+name = "hangul_normalize"
+crate-type = ["cdylib"]
+
+[dependencies.cpython]
+version = "0.5"
+features = ["extension-module"]
