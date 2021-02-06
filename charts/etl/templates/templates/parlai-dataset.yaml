@@ -47,6 +47,7 @@ spec:
           format = "{{`{{inputs.parameters.format}}`}}"
           output_path = "{{`{{inputs.parameters.outputPath}}`}}"
           skip_non_text = "{{`{{inputs.parameters.skipNonText}}`}}"
+
           import datetime
           from pyspark.sql import SparkSession, types as T, functions as F, Row
           from pyspark.sql.window import Window
@@ -77,7 +78,9 @@ spec:
               return df.filter(~F.col(col).startswith('<'))
 
           d2c_df = df.selectExpr('gallery_id', 'title', 'author', 'EXPLODE(comments) as comment')
-          d2c_df = d2c_df.selectExpr('gallery_id', 'title', 'author', 'comment.contents as comment', 'comment.author as comm_author')\
+          d2c_df = d2c_df.selectExpr(
+              'gallery_id', 'title', 'author', 
+              'comment.contents as comment', 'comment.author as comm_author')\
               .filter(F.col('author') != F.col('comm_author'))\
               .select('gallery_id', 'title', 'comment')
           d2c_df = d2c_df.filter((~F.col('comment').startswith('<div')) & (~F.col('comment').isNull()))
@@ -87,8 +90,8 @@ spec:
               d2c_df = filter_non_text(d2c_df, 'comment')
           else:
               d2c_df = dccon_parse(d2c_df, 'comment')
-          d2c_df = d2c_df.selectExpr('''CONCAT("text:", "<gallery ", gallery_id, ">", title, '\t',
-                                        'labels:', comment, '\t', "episode_done:True") AS episode ''')
+          d2c_df = d2c_df.selectExpr('''CONCAT("text:", "<gallery ", gallery_id, "> ", title, "\t",
+                                        "labels:", comment, "\t", "episode_done:True") AS episode ''')
           d2c_df = d2c_df.distinct()
 
 
@@ -99,7 +102,10 @@ spec:
                       'comment.created_at', F.coalesce('comment.parent_id', 'comment.id').alias('root_id'))
           c2c_df = c2c_df.filter((~F.col('contents').startswith('<div')) & (~F.col('contents').isNull()))
           window = Window.partitionBy('gallery_id', 'document_id', 'root_id').orderBy('created_at')
-          c2c_df = c2c_df.withColumn('dialog_size', F.count('*').over(Window.partitionBy('gallery_id', 'document_id', 'root_id'))).filter(F.col('dialog_size') > 1)
+          c2c_df = c2c_df.withColumn(
+              'dialog_size', 
+              F.count('*').over(Window.partitionBy('gallery_id', 'document_id', 'root_id')))\
+              .filter(F.col('dialog_size') > 1)
           c2c_df = c2c_df.withColumn('contents', F.regexp_replace('contents', r'[\s\n\t]+', ' '))
           if skip_non_text.upper() == 'TRUE':
               c2c_df = filter_non_text(c2c_df, 'contents')
@@ -115,12 +121,17 @@ spec:
                   F.concat_ws(". ", F.collect_list('contents')).alias('contents'),
                   F.first('created_at').alias('created_at'))\
               .withColumn('contents', F.concat(
-                  F.when(F.col('is_root_author'), F.concat(F.lit('text:'), F.lit('<gallery '), 'gallery_id', F.lit('>'))).otherwise(F.lit('labels:')),
+                  F.when(
+                      F.col('is_root_author'), 
+                      F.concat(F.lit('text:'), 
+                      F.lit('<gallery '), 'gallery_id', F.lit('> '))).otherwise(F.lit('labels:')),
                   'contents'))
           c2c_df = c2c_df\
               .groupBy('gallery_id', 'document_id', 'root_id').agg(
                   F.max('dialog_id').alias('dialog_real_size'),
-                  F.concat(F.concat_ws("\t", F.collect_list('contents')).alias('contents'), F.lit("\tepisode_done:True")).alias('contents'),
+                  F.concat(
+                    F.concat_ws("\t", F.collect_list('contents')).alias('contents'), 
+                    F.lit("\tepisode_done:True")).alias('contents'),
               )\
               .filter(F.col('dialog_real_size') > 1)\
               .select('contents')
