@@ -1,7 +1,6 @@
 environments:
   prod:
     secrets:
-    - "envs/{{ .Environment.Name }}/data-access-secrets.yaml"
     - "envs/{{ .Environment.Name }}/secrets.yaml"
     values:
     - "envs/values.yaml"

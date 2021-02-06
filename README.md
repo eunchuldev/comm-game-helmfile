@@ -1,4 +1,4 @@
-# sa-kube
+# comm-game
 
 ## Dependencies
 
@@ -11,7 +11,6 @@
 * [helmfile](https://github.com/roboll/helmfile)
 * [sops](https://github.com/mozilla/sops)
 * [argo-cli](https://github.com/argoproj/argo/releases)
-* [kustomize](https://kubectl.docs.kubernetes.io/installation/kustomize/)
 * [direnv](https://direnv.net/) - Optional
 
 
@@ -85,5 +84,3 @@ Also images under `images/` CI/CD pipeline automatically build, tag with commit 
 
 
 ## Diagram
-
-![sa-k8s](https://user-images.githubusercontent.com/6138947/103160922-1ac0e500-481e-11eb-9c2c-1d1356ccd2ff.png)
