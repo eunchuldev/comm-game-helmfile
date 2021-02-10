@@ -4,7 +4,7 @@
 # Included components:
 # pyspark, mysql connectors
 #
-ARG SPARK_IMAGE=song9446/spark:3.0.1-hadoop-3.3.0
+ARG SPARK_IMAGE=song9446/spark:3.1.1-rc2-hadoop-3.3.0
 FROM ${SPARK_IMAGE}
 
 USER root
@@ -17,26 +17,38 @@ ADD https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-latest-hadoop3.j
 ADD https://storage.googleapis.com/spark-lib/bigquery/spark-bigquery-latest_2.12.jar $SPARK_HOME/jars
 
 # Setup dependencies for Azure Blob Storage access.
-ADD https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-azure/3.3.0/hadoop-azure-3.3.0.jar $SPARK_HOME/jars
+#ADD https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-azure/3.3.0/hadoop-azure-3.3.0.jar $SPARK_HOME/jars
 
 # Setup for the Prometheus JMX exporter.
 # Add the Prometheus JMX exporter Java agent jar for exposing metrics sent to the JmxSink to Prometheus.
-ADD https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.11.0/jmx_prometheus_javaagent-0.11.0.jar $SPARK_HOME/jars
+# ADD https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.11.0/jmx_prometheus_javaagent-0.11.0.jar $SPARK_HOME/jars
 
 # Mysql Connector
-ADD https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.11/mysql-connector-java-8.0.11.jar $SPARK_HOME/jars
+# ADD https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.11/mysql-connector-java-8.0.11.jar $SPARK_HOME/jars
 
-RUN chmod -R 777 $SPARK_HOME/jars/
+# PG Connector
+ADD https://repo1.maven.org/maven2/org/postgresql/postgresql/42.2.18/postgresql-42.2.18.jar $SPARK_HOME/jars
 
-ARG APT_PACKAGES="python3-pip python3 procps"
+RUN chmod 777 \
+  $SPARK_HOME/jars/guava-30.0-jre.jar \
+  $SPARK_HOME/jars/gcs-connector-latest-hadoop3.jar \
+  $SPARK_HOME/jars/spark-bigquery-latest_2.12.jar \
+  $SPARK_HOME/jars/postgresql-42.2.18.jar 
+
+ARG APT_PACKAGES="python3-pip python3 procps python3-setuptools"
+ARG BUILD_PACAGES="git cmake g++ gcc make ca-certificates lsb-release wget"
+ARG PIP_PACKAGES="pandas pyarrow==3.0.*"
+
 RUN apt-get update && \
-  apt-get install --no-install-recommends --yes $APT_PACKAGES && \
-  rm -rf /var/cache/apt/* && \
+  apt-get install --no-install-recommends --yes $APT_PACKAGES $BUILD_PACAGES && \
   ln -s /usr/bin/python3 /usr/local/bin/python && \
-  ln -s /usr/bin/pip3 /usr/local/bin/pip
+  ln -s /usr/bin/pip3 /usr/local/bin/pip && \
+  python3 -m pip install --upgrade pip && \ 
+  python3 -m pip install $PIP_PACKAGES && \
+  apt-get remove --yes $BUILD_PACKAGES && \
+  apt-get autoremove --yes && \
+  rm -rf /var/cache/apt/* 
 
-ARG PIP_PACKAGES="setuptools pandas pyarrow"
-RUN python3 -m pip install $PIP_PACKAGES
 
 ARG PYSPARK_HOME="/usr/local/lib/python3.7/dist-packages/pyspark"
 RUN cd /opt/spark/python && \
