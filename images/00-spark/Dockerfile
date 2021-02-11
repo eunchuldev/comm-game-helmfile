@@ -4,7 +4,7 @@
 # Included components:
 # pyspark, mysql connectors
 #
-ARG SPARK_IMAGE=song9446/spark:3.1.1-rc2-hadoop-3.3.0
+ARG SPARK_IMAGE=song9446/spark:3.0.1-hadoop-3.3.0
 FROM ${SPARK_IMAGE}
 
 USER root
