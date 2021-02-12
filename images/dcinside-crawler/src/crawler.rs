@@ -35,7 +35,7 @@ struct CommentsPostForm<'a> {
     _GALLTYPE_: &'a str,
 }
 
-async fn back_off<F, O, E>(delay: u64, max_delay: u64, f: impl Fn() -> F) -> Result<O, E>
+/*async fn back_off<F, O, E>(delay: u64, max_delay: u64, f: impl Fn() -> F) -> Result<O, E>
 where F: futures::Future<Output = Result<O, E>>,
 {
     let mut i = 0;
@@ -48,7 +48,48 @@ where F: futures::Future<Output = Result<O, E>>,
         i += 1;
         actix::clock::delay_for(Duration::from_millis(delay*i)).await;
     }
+}*/
+
+macro_rules! back_off {
+    ($delay:expr, $max_delay:expr, $($escape_rule:pat)|+, $($func:tt)+) => {
+        {
+        let mut i = 0;
+        let f = $($func)+;
+        loop {
+            let res = f().await;
+            if res.is_ok() || i * $delay >= $max_delay {
+                break res;
+            }
+            match &res {
+                Err(t) => match t {
+                    $($escape_rule)|+ => break res,
+                    _ => (),
+                },
+                _ => (),
+            };
+            println!("{} {}", "backoff..", i);
+            i += 1;
+            actix::clock::delay_for(Duration::from_millis($delay*i)).await;
+        }
+        }
+    };
+    ($delay:expr, $max_delay:expr, $($pattern:tt)+) => {
+        {
+        let mut i = 0;
+        let f = $($pattern)+;
+        loop {
+            let res = f().await;
+            if res.is_ok() || i * $delay >= $max_delay {
+                break res;
+            }
+            println!("{} {}", "backoff..", i);
+            i += 1;
+            actix::clock::delay_for(Duration::from_millis($delay*i)).await;
+        }
+        }
+    }
 }
+
 
 #[derive(Clone)]
 pub struct Crawler {
@@ -86,7 +127,7 @@ impl<'a> Crawler {
             jsonp_callback_func,
             Utc::now().timestamp_millis()
         );
-        Ok(back_off(1000, 1000*10, || async {
+        Ok(back_off!(1000, 1000*10, || async {
             let bytes = self
                 .client
                 .get(path.as_str())
@@ -101,7 +142,7 @@ impl<'a> Crawler {
                 g.kind = GalleryKind::Major;
             }
             Ok::<_, CrawlerError>(galleries)
-        }).await?)
+        })?)
     }
     pub async fn realtime_hot_minor_galleries(&self) -> Result<Vec<GalleryIndex>, CrawlerError> {
         let jsonp_callback_func = format!(
@@ -113,7 +154,7 @@ impl<'a> Crawler {
             jsonp_callback_func,
             Utc::now().timestamp_millis()
         );
-        Ok(back_off(1000, 1000*10, || async {
+        Ok(back_off!(1000, 1000*10, || async {
             let bytes = self
                 .client
                 .get(path.as_str())
@@ -128,7 +169,7 @@ impl<'a> Crawler {
                 g.kind = GalleryKind::Minor;
             }
             Ok::<_, CrawlerError>(galleries)
-        }).await?)
+        })?)
     }
     pub async fn document_indexes_after(
         &mut self,
@@ -213,7 +254,7 @@ impl<'a> Crawler {
     ) -> Result<String, CrawlerError> {
         let path = format!("{}/board/view/?id={}&no={}&page=1", self.host, gallery.id, id);
         let referer = format!("{}/board/lists?id={}", self.host, gallery.id);
-        Ok(back_off(1000, 1000*10, || async {
+        Ok(back_off!(1000, 1000*10, || async {
             let bytes = self
                 .client
                 .get(path.as_str())
@@ -222,7 +263,7 @@ impl<'a> Crawler {
                 .body().limit(1024*1024*8).await?;
             let text = std::str::from_utf8(&bytes)?;
             Ok::<_, CrawlerError>(parse_document_body(text, &gallery.id, id)?)
-        }).await?)
+        })?)
     }
     pub async fn documents_after(
         &mut self,
@@ -283,7 +324,7 @@ impl<'a> Crawler {
                _ => panic!("other than major, minor gallery is not supported yet"),
             }
         };
-        Ok(back_off(1000, 1000*10, || async {
+        Ok(back_off!(1000, 1000*10, || async {
             let bytes = self
                .client
                .post(path.as_str())
@@ -300,7 +341,7 @@ impl<'a> Crawler {
                .body().limit(1024*1024*8).await?;
             let text = std::str::from_utf8(&bytes)?;
             Ok::<_, CrawlerError>(parse_comments(text, &gallery.id, doc_id, last_root_comment_id)?)
-        }).await?)
+        })?)
     }
     pub async fn document_indexes(
         &mut self,
@@ -318,7 +359,14 @@ impl<'a> Crawler {
             ),
             _ => panic!("mini gallery kind not supported yet"),
         };
-        let (e_s_n_o, res) = back_off(1000, 1000*10, || async {
+        let (e_s_n_o, res) = back_off!(
+            1000, 
+            1000*10, 
+            CrawlerError::DocumentParseError(DocumentParseError::AdultPage) | 
+            CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryClosed) | 
+            CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryPromoted) | 
+            CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryAccessNotAllowed), 
+            || async {
             let bytes = self
                 .client
                 .get(path.as_str())
@@ -326,17 +374,15 @@ impl<'a> Crawler {
                 .send().await?
                 .body().limit(1024*1024*8).await?;
             let text = std::str::from_utf8(&bytes)?;
-            if text.starts_with("<script type=\"text/javascript\">location.replace(\"/error/adault") {
-                Err(DocumentParseError::AdultPage)?;
-            }
+            let parsed = parse_document_indexes(text, &gallery.id)?;
             let e_s_n_o = Some(HTMLDocument::from(text)
                 .select(Attr("id", "e_s_n_o"))
                 .next()
                 .ok_or(DocumentParseError::Select { path: ".e_s_n_o", html: text.to_string() })?
                 .attr("value")
                 .ok_or(DocumentParseError::Select { path: ".e_s_n_o@value", html: text.to_string() })?.to_string());
-            Ok::<_, CrawlerError>((e_s_n_o, parse_document_indexes(text, &gallery.id)?))
-        }).await?;
+            Ok::<_, CrawlerError>((e_s_n_o, parsed))
+        })?;
         self.e_s_n_o = e_s_n_o;
         Ok(res)
     }

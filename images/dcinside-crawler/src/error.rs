@@ -14,6 +14,12 @@ pub enum DocumentParseError {
     JsonParse(#[source] serde_json::Error),
     #[error(display = "need adult auth")]
     AdultPage,
+    #[error(display = "closed minor gallery")]
+    MinorGalleryClosed,
+    #[error(display = "minor gallery become major gallery")]
+    MinorGalleryPromoted,
+    #[error(display = "minor gallery access not allowed")]
+    MinorGalleryAccessNotAllowed
 }
 
 #[derive(Error, Debug)]

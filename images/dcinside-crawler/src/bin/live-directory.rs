@@ -14,7 +14,7 @@ use dcinside_crawler::model::*;
 use serde::Deserialize;
 
 use actix_web_prom::PrometheusMetrics;
-use prometheus::{IntGauge};
+use prometheus::{IntGauge, IntCounterVec, opts, labels};
 
 use log::{info, error};
 
@@ -54,23 +54,26 @@ struct State {
     crawler: Crawler,
     gallery_db: sled::Tree,
     gallery_kind: GalleryKind,
+    metrics: Metrics,
 }
 
 impl State {
-    fn new(gallery_kind: GalleryKind) -> Self {
+    fn new(gallery_kind: GalleryKind, metrics: Metrics) -> Self {
         let config = sled::Config::new().temporary(true);
         let db = config.open().unwrap().open_tree("galleries").unwrap();
         State {
             crawler: Crawler::new(),
             gallery_db: db,
             gallery_kind,
+            metrics,
         }
     }
-    fn with_db(db: sled::Tree, gallery_kind: GalleryKind) -> Self {
+    fn with_db(db: sled::Tree, gallery_kind: GalleryKind, metrics: Metrics) -> Self {
         State {
             crawler: Crawler::new(),
             gallery_db: db,
             gallery_kind,
+            metrics,
         }
     }
     async fn update(&self) -> Result<(), LiveDirectoryError> {
@@ -98,13 +101,17 @@ impl State {
                     old_state.index = new_index;
                     serde_json::to_vec(&old_state).unwrap()
                 },
-                None => serde_json::to_vec(&new_state).unwrap(),
+                None => {
+                    serde_json::to_vec(&new_state).unwrap()
+                }
             }))?;
         }
+        self.metrics.gallery_total.set(self.gallery_db.len().try_into().unwrap());
         Ok(())
     }
     fn report(&self, form: GalleryCrawlReportForm) -> Result<(), LiveDirectoryError> {
         let mut found = false;
+        self.metrics.worker_report_success_total.with_label_values(&[form.worker_part.to_string().as_str()]).inc();
         self.gallery_db.fetch_and_update(form.id.as_bytes(), |old| match old {
             Some(bytes) => {
                 found = true;
@@ -122,6 +129,15 @@ impl State {
             Err(LiveDirectoryError::NotFound)
         }
     }
+    fn error_report(&self, form: GalleryCrawlErrorReportForm) -> Result<(), LiveDirectoryError> {
+        self.metrics.worker_report_error_total.with_label_values(&[form.worker_part.to_string().as_str()]).inc();
+        if form.permanent {
+            self.gallery_db.remove(form.id.as_bytes())?;
+            self.metrics.gallery_total.set(self.gallery_db.len().try_into().unwrap());
+        }
+        Ok(())
+    }
+
     fn list_part(&self, total: u64, part: u64) -> Vec<GalleryState> {
         self.gallery_db.iter().filter_map(|res| {
             if res.is_err() {
@@ -140,11 +156,10 @@ impl State {
     }
 }
 
-async fn update_forever(state: State, delay: Duration, db_size_gauge: IntGauge) -> Result<(), LiveDirectoryError> {
+async fn update_forever(state: State, delay: Duration) -> Result<(), LiveDirectoryError> {
     info!("start update live directory");
     loop {
         state.update().await?;
-        db_size_gauge.set(state.gallery_db.len().try_into().unwrap());
         info!("update live directory done. wait {} seconds..", delay.as_secs());
         actix::clock::delay_for(delay).await;
     }
@@ -178,12 +193,31 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(health).service(list_part).service(report);
 }
 
+#[derive(Clone)]
+struct Metrics {
+    gallery_total: IntGauge,
+    worker_report_success_total: IntCounterVec,
+    worker_report_error_total: IntCounterVec,
+}
+
+impl Default for Metrics {
+    fn default() -> Self {
+        Metrics{
+            gallery_total: IntGauge::new("dccrawler_gallery_total", "dccrawler_gallery_total").unwrap(),
+            worker_report_success_total: IntCounterVec::new(opts!("dccrawler_worker_report_success_total", "dccrawler_worker_report_success_total"), &["part"]).unwrap(),
+            worker_report_error_total: IntCounterVec::new(opts!("dccrawler_worker_report_error_total", "dccrawler_worker_report_error_total"), &["part"]).unwrap(),
+        }
+    }
+}
+
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     pretty_env_logger::init();
 
     let port = std::env::var("PORT").unwrap_or("8080".to_string());
     let store_path = std::env::var("STORE_PATH").unwrap_or("".to_string());
+    let total_worker_count: u64 = std::env::var("TOTAL_WORKER_COUNT").unwrap_or("30".to_string()).parse().unwrap();
     let gallery_kind = match std::env::var("GALLERY_KIND").unwrap_or("major".to_string()).as_ref() {
         "major" => GalleryKind::Major,
         "minor" => GalleryKind::Minor,
@@ -192,11 +226,20 @@ async fn main() -> std::io::Result<()> {
     };
 
     let prometheus = PrometheusMetrics::new("api", Some("/metrics"), None);
-    let counter = IntGauge::new("major_gallery_count", "major_gallery_count").unwrap();
-    prometheus
-        .registry
-        .register(Box::new(counter.clone()))
-        .unwrap();
+    let metrics = Metrics {
+        gallery_total: IntGauge::with_opts(opts!("dccrawler_gallery_total", "dccrawler_gallery_total", match gallery_kind {
+            GalleryKind::Major => labels!{ "gallery_kind" => "major" },
+            GalleryKind::Minor => labels!{ "gallery_kind" => "minor" },
+            GalleryKind::Mini => labels!{ "gallery_kind" => "mini" },
+        })).unwrap(),
+        worker_report_success_total: IntCounterVec::new(opts!("dccrawler_worker_report_success_total", "dccrawler_worker_report_success_total"), &["part"]).unwrap(),
+        worker_report_error_total: IntCounterVec::new(opts!("dccrawler_worker_report_error_total", "dccrawler_worker_report_error_total"), &["part"]).unwrap(),
+    };
+
+    let reg = prometheus.clone().registry;
+    reg.register(Box::new(metrics.gallery_total.clone())).unwrap();
+    reg.register(Box::new(metrics.worker_report_error_total.clone())).unwrap();
+    reg.register(Box::new(metrics.worker_report_success_total.clone())).unwrap();
 
     let db = if store_path.is_empty() {
         let config = sled::Config::new().temporary(true);
@@ -206,18 +249,19 @@ async fn main() -> std::io::Result<()> {
     };
     let db = db.open_tree("galleries").unwrap();
 
+    let _metrics = metrics.clone();
     let db2 = db.clone();
     actix_rt::spawn(async move {
         loop {
-            let state = State::with_db(db2.clone(), gallery_kind);
-            let res = update_forever(state, Duration::from_secs(60), counter.clone()).await; 
+            let state = State::with_db(db2.clone(), gallery_kind, _metrics.clone());
+            let res = update_forever(state, Duration::from_secs(60)).await; 
             if let Err(e) = res {
                 error!("updator restart due to: {}", e.to_string());
             }
         }
     });
     HttpServer::new(move || {
-        let state = State::with_db(db.clone(), gallery_kind);
+        let state = State::with_db(db.clone(), gallery_kind, metrics.clone());
         App::new()
             .wrap(prometheus.clone())
             .app_data(web::Data::new(state))
@@ -237,7 +281,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn state_update_minor_list_part() {
-        let state = State::new(GalleryKind::Minor);
+        let state = State::new(GalleryKind::Minor, Metrics::default());
         state.update().await.unwrap();
         let res1 = state.list_part(2, 0);
         let res2 = state.list_part(2, 1);
@@ -247,10 +291,11 @@ mod tests {
         for t in res1.iter() { h.insert(t.index.id.clone()); }
         for t in res2.iter() { h.insert(t.index.id.clone()); }
         assert_eq!(h.len(), res1.len() + res2.len());
+        assert_eq!(state.metrics.gallery_total.get() as usize, res1.len() + res2.len());
     }
     #[actix_rt::test]
     async fn state_update_list_part() {
-        let state = State::new(GalleryKind::Major);
+        let state = State::new(GalleryKind::Major, Metrics::default());
         state.update().await.unwrap();
         let res1 = state.list_part(2, 0);
         let res2 = state.list_part(2, 1);
@@ -260,15 +305,17 @@ mod tests {
         for t in res1.iter() { h.insert(t.index.id.clone()); }
         for t in res2.iter() { h.insert(t.index.id.clone()); }
         assert_eq!(h.len(), res1.len() + res2.len());
+        assert_eq!(state.metrics.gallery_total.get() as usize, res1.len() + res2.len());
     }
     #[actix_rt::test]
     async fn state_report() {
-        let state = State::new(GalleryKind::Major);
+        let state = State::new(GalleryKind::Major, Metrics::default());
         state.update().await.unwrap();
         let res1 = state.list_part(2, 0);
         assert!(res1[0].last_crawled_at.is_none());
         let now = Utc::now();
         state.report(GalleryCrawlReportForm{
+            worker_part: 1u64,
             id: res1[0].index.id.clone(),
             last_crawled_at: Some(now.clone()),
             last_crawled_document_id: Some(1),
@@ -276,6 +323,24 @@ mod tests {
         let res1 = state.list_part(2, 0);
         assert_eq!(res1[0].last_crawled_at, Some(now));
         assert_eq!(res1[0].last_crawled_document_id, Some(1));
+        assert_eq!(state.metrics.worker_report_success_total.with_label_values(&["1"]).get(), 1);
+    }
+    #[actix_rt::test]
+    async fn state_error_report() {
+        let state = State::new(GalleryKind::Major, Metrics::default());
+        state.update().await.unwrap();
+        let res1 = state.list_part(2, 0);
+        assert!(res1[0].last_crawled_at.is_none());
+        let now = Utc::now();
+        state.error_report(GalleryCrawlErrorReportForm{
+            worker_part: 1u64,
+            id: res1[0].index.id.clone(),
+            permanent: true,
+        }).unwrap();
+        let res2 = state.list_part(2, 0);
+        assert_ne!(res1.len(), res2.len());
+        assert_ne!(res1[0].index.id, res2[0].index.id);
+        assert_eq!(state.metrics.worker_report_error_total.with_label_values(&["1"]).get(), 1);
     }
 
     #[actix_rt::test]

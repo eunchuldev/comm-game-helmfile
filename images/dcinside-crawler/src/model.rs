@@ -199,7 +199,17 @@ pub fn parse_document_indexes(
 
     if body.starts_with("<script type=\"text/javascript\">location.replace(\"/error/adault") {
         return Err(DocumentParseError::AdultPage);
-    }
+    } else if body.starts_with("<script type=\"text/javascript\">alert(\"해당 마이너 갤러리는 매니저의 요청으로 폐쇄되었습니다.") {
+        return Err(DocumentParseError::MinorGalleryClosed);
+    } else if body.starts_with("<script type=\"text/javascript\">location.replace(\"https://gall.dcinside.com/board/lists?") {
+        return Err(DocumentParseError::MinorGalleryPromoted);
+    } else if let Some(node) = doc.select(Class("migall_state")).next() {
+        if let Some(c) = node.attr("class") {
+            if c.find("restriction").is_some() {
+                return Err(DocumentParseError::MinorGalleryAccessNotAllowed);
+            }
+        }
+    } 
 
     Ok(doc
         .select(Class("us-post"))
@@ -328,14 +338,32 @@ pub struct GalleryState {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GalleryCrawlReportForm {
+    pub worker_part: u64,
     pub id: String,
     pub last_crawled_at: Option<DateTime<Utc>>,
     pub last_crawled_document_id: Option<usize>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GalleryCrawlErrorReportForm {
+    pub worker_part: u64,
+    pub id: String,
+    pub permanent: bool, 
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    macro_rules! assert_err {
+        ($expression:expr, $($pattern:tt)+) => {
+            match $expression {
+                $($pattern)+ => (),
+                ref e => panic!("expected `{}` but got `{:?}`", stringify!($($pattern)+), e),
+            }
+        }
+    }
+
     #[test]
     fn it_parses_document_indexes() {
         let res = parse_document_indexes(include_str!("../assets/gallery.html"), "gallery_id").unwrap();
@@ -395,5 +423,23 @@ mod tests {
     fn it_parses_document_body() {
         let res = parse_document_body(include_str!("../assets/body.html"), "gallery_id", 1).unwrap();
         assert_eq!(res, "\n\t\t\t\t\t\t\t<p>\'올림픽\' 개최 위해 백신팀 극비리 가동<br><br>전국민 맞고 남을 만큼 확보했지만<br><br>\'국내 1~3차 임상 필수\' 규제에 발목<br><br>\"국산 백신은 왜 없나\" 비판도 일어<br><br>백신을 빨리 확보했음에도, 정작 접종시기는 2월말 - 한국과 차이 X<br><br>일본은 국내 임상 1,2,3차를 거쳐야 하는데, 모더나는 1월경 임상시험에 들어간다고 발표, 그러나 언제 접종할 지에 대해선 타임라인 제시 X</p><p><br></p><p><br></p><p style=\"text-align:left;\"><img src=\"https://dcimg8.dcinside.co.kr/viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a8551648461846084596f34596bb9e7a7968b67c\" style=\"cursor:pointer;\" onclick=\"javascript:imgPop(\'https://image.dcinside.com/viewimagePop.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364ad33fbacc76da4d6aa29c4891b49fe3513541273923ef18\',\'image\',\'fullscreen=yes,scrollbars=yes,resizable=no,menubar=no,toolbar=no,location=no,status=no\');\" alt=\"viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a8551648461846084596f34596bb9e7a7968b67c\"></p><p style=\"text-align:left;\">18시 현재 6,055명 (도쿄 1,494명 )<br><br>일요일 기준 최고치 갱신 중<br></p><p><br></p><p style=\"text-align:left;\"><img src=\"https://dcimg8.dcinside.co.kr/viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a85516484618460810c0a219c177961ee0f408ae\" style=\"cursor:pointer;\" onclick=\"javascript:imgPop(\'https://image.dcinside.com/viewimagePop.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364ad33fbacc76da4d6aa29c48c4e2cebf0663432839231131\',\'image\',\'fullscreen=yes,scrollbars=yes,resizable=no,menubar=no,toolbar=no,location=no,status=no\');\" alt=\"viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a85516484618460810c0a219c177961ee0f408ae\"></p><p><br></p>\t\t\t\t\t\t\t\t".to_string());
+    }
+
+    #[test]
+    fn it_parses_prohibited() {
+        let res = parse_document_indexes(include_str!("../assets/prohibited.html"), "gallery_id");
+        assert_err!(res, Err(DocumentParseError::MinorGalleryAccessNotAllowed));
+    }
+
+    #[test]
+    fn it_parses_promoted() {
+        let res = parse_document_indexes(r#"<script type="text/javascript">location.replace("https://gall.dcinside.com/board/lists?id=wln");</script>"#, "gallery_id");
+        assert_err!(res, Err(DocumentParseError::MinorGalleryPromoted));
+    }
+
+    #[test]
+    fn it_pareses_closed() {
+        let res = parse_document_indexes(r#"<script type="text/javascript">alert("해당 마이너 갤러리는 매니저의 요청으로 폐쇄되었습니다.\n마이너 갤러리 메인으로 돌아갑니다.");</script><script type="text/javascript">location.replace("https://gall.dcinside.com/m");</script>"#, "gallery_id");
+        assert_err!(res, Err(DocumentParseError::MinorGalleryClosed));
     }
 }

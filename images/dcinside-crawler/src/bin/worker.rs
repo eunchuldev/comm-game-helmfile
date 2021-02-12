@@ -81,7 +81,15 @@ impl State {
         let bytes = self.crawler.client.get(format!("{}/list", self.live_directory_url)).query(&ListPartQuery{ total: self.total, part: self.part }).unwrap().send().await?.body().limit(1024*1024*8).await?;
         Ok(serde_json::from_slice(&bytes)?)
     }
-    async fn report(&self, form: GalleryCrawlReportForm) -> Result<(), WorkerError> {
+    async fn error_report(&self, form: GalleryCrawlErrorReportForm) -> Result<(), WorkerError> {
+        let res = self.crawler.client.post(format!("{}/error-report", self.live_directory_url)).send_json(&form).await?;
+        if res.status() == StatusCode::OK {
+            Ok(())
+        } else {
+            Err(WorkerError::Response(res.status()))
+        }
+    }
+    async fn report_success(&self, form: GalleryCrawlReportForm) -> Result<(), WorkerError> {
         let res = self.crawler.client.post(format!("{}/report", self.live_directory_url)).send_json(&form).await?;
         if res.status() == StatusCode::OK {
             Ok(())
@@ -147,8 +155,9 @@ impl State {
                             }
                         };
                     }
-                    if let Err(e) = self.report(GalleryCrawlReportForm {
+                    if let Err(e) = self.report_success(GalleryCrawlReportForm {
                         id: gallery_state.index.id.clone(),
+                        worker_part: self.part,
                         last_crawled_at: Some(now),
                         last_crawled_document_id: if last_document_id > 0 { Some(last_document_id) } else { None },
                     }).await {
@@ -158,6 +167,32 @@ impl State {
                 Err(err) => {
                     error!("get index of {} fail: {}", &gallery_state.index.id, err.to_string());
                     metric.gallery_error += 1;
+                    match &err {
+                        CrawlerError::DocumentParseError(DocumentParseError::AdultPage) | 
+                        CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryClosed) |
+                        CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryPromoted) |
+                        CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryAccessNotAllowed) => {
+                            error!("report error");
+                            if let Err(e) = self.error_report(GalleryCrawlErrorReportForm {
+                                worker_part: self.part,
+                                id: gallery_state.index.id.clone(),
+                                permanent: true,
+                            }).await {
+                                error!("error while error report: {}", e.to_string());
+                            };
+                        },
+                        _ => {
+                            error!("report error");
+                            if let Err(e) = self.error_report(GalleryCrawlErrorReportForm {
+                                worker_part: self.part,
+                                id: gallery_state.index.id.clone(),
+                                permanent: false,
+                            }).await {
+                                error!("error while error report: {}", e.to_string());
+                            };
+
+                        }
+                    }
                 }
             };
         };
@@ -215,12 +250,12 @@ async fn main() -> std::io::Result<()> {
 
     let prometheus = PrometheusMetrics::new("api", Some("/metrics"), None);
     let metrics = ResultMetricGauges {
-        gallery_success: IntGauge::new("gallery_success", "gallery_success").unwrap(),
-        gallery_error: IntGauge::new("gallery_error", "gallery_error").unwrap(),
-        document_success: IntGauge::new("document_success", "document_success").unwrap(),
-        document_error: IntGauge::new("document_error", "document_error").unwrap(),
-        comment_success: IntGauge::new("comment_success", "comment_success").unwrap(),
-        comment_error: IntGauge::new("comment_error", "comment_error").unwrap(),
+        gallery_success: IntGauge::new("dccrawler_gallery_success", "gallery_success").unwrap(),
+        gallery_error: IntGauge::new("dccrawler_gallery_error", "gallery_error").unwrap(),
+        document_success: IntGauge::new("dccrawler_document_success", "document_success").unwrap(),
+        document_error: IntGauge::new("dccrawler_document_error", "document_error").unwrap(),
+        comment_success: IntGauge::new("dccrawler_comment_success", "comment_success").unwrap(),
+        comment_error: IntGauge::new("dccrawler_comment_error", "comment_error").unwrap(),
     };
 
     let reg = prometheus.clone().registry;
