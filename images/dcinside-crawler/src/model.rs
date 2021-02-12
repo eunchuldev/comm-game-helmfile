@@ -334,7 +334,9 @@ pub struct GalleryState {
     pub last_ranked: DateTime<Utc>,
     pub last_crawled_at: Option<DateTime<Utc>>,
     pub last_crawled_document_id: Option<usize>,
+    #[serde(default = "true")]
     pub visible: bool,
+    #[serde(default)]
     pub last_error: Option<CrawlerErrorReport>,
 }
 
