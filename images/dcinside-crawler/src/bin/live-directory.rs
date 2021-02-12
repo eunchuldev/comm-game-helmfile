@@ -14,7 +14,7 @@ use dcinside_crawler::model::*;
 use serde::Deserialize;
 
 use actix_web_prom::PrometheusMetrics;
-use prometheus::{IntGauge, IntCounterVec, opts, labels};
+use prometheus::{IntGauge, IntCounterVec, opts, labels, Histogram, HistogramOpts};
 
 use log::{info, error};
 
@@ -104,6 +104,7 @@ impl State {
                     old_state.last_ranked = now.clone();
                     old_state.index = new_index;
                     old_state.visible = true;
+                    old_state.last_published_at = None;
                     serde_json::to_vec(&old_state).unwrap()
                 },
                 None => {
@@ -117,14 +118,15 @@ impl State {
     fn report(&self, form: GalleryCrawlReportForm) -> Result<(), LiveDirectoryError> {
         let mut found = false;
         self.metrics.worker_report_success_total.with_label_values(&[self.gallery_kind.into(), form.worker_part.to_string().as_str()]).inc();
+        self.metrics.crawled_document_count_histogram.observe(form.crawled_document_count as f64);
         self.gallery_db.fetch_and_update(form.id.as_bytes(), |old| match old {
             Some(bytes) => {
                 found = true;
                 serde_json::from_slice::<GalleryState>(bytes).map(|mut old_state| {
                     old_state.publish_duration_in_seconds = match (form.last_crawled_at, old_state.last_published_at) {
-                        (Some(n), Some(o)) => (n.signed_duration_since(o).num_seconds() as f32) / (form.crawled_document_count as f32),
-                        (Some(n), _) => 0.0,
-                        _ => 0.0,
+                        (Some(n), Some(o)) => (n.signed_duration_since(o).num_seconds() as f64) / (form.crawled_document_count as f64),
+                        (Some(n), _) => 0.0f64,
+                        _ => 0.0f64,
                     };
                     if form.crawled_document_count > 0 || old_state.last_published_at.is_none() {
                         old_state.last_published_at = form.last_crawled_at;
@@ -184,10 +186,11 @@ impl State {
                 Ok(v) if v.visible => 
                     match v.last_published_at {
                         Some(t) => {
-                            let duration_from_last_publish = now.signed_duration_since(t).num_seconds() as f32;
+                            let duration_from_last_publish = now.signed_duration_since(t).num_seconds() as f64;
                             let wait_time = (v.publish_duration_in_seconds*1.0)
                                 .min(duration_from_last_publish)
-                                .min(3600.0);
+                                .min(3600.0*24.0);
+                            self.metrics.crawl_waittime_histogram.observe(wait_time);
                             if duration_from_last_publish >= wait_time {
                                 Some(v)
                             } else {
@@ -251,6 +254,8 @@ struct Metrics {
     gallery_total: IntGauge,
     worker_report_success_total: IntCounterVec,
     worker_report_error_total: IntCounterVec,
+    crawl_waittime_histogram: Histogram,
+    crawled_document_count_histogram: Histogram,
 }
 
 impl Default for Metrics {
@@ -259,6 +264,8 @@ impl Default for Metrics {
             gallery_total: IntGauge::new("dccrawler_gallery_total", "dccrawler_gallery_total").unwrap(),
             worker_report_success_total: IntCounterVec::new(opts!("dccrawler_worker_report_success_total", "dccrawler_worker_report_success_total"), &["gallery_kind", "part"]).unwrap(),
             worker_report_error_total: IntCounterVec::new(opts!("dccrawler_worker_report_error_total", "dccrawler_worker_report_error_total"), &["gallery_kind", "part"]).unwrap(),
+            crawl_waittime_histogram: Histogram::with_opts(HistogramOpts::new("dccrawler_crawl_waittime_histogram", "dccrawler_crawl_waittime_histogram")).unwrap(),
+            crawled_document_count_histogram: Histogram::with_opts(HistogramOpts::new("dccrawler_crawled_document_count_histogram", "dccrawler_crawled_document_count_histogram")).unwrap(),
         }
     }
 }
@@ -273,17 +280,37 @@ async fn main() -> std::io::Result<()> {
     let total_worker_count: u64 = std::env::var("TOTAL_WORKER_COUNT").unwrap_or("30".to_string()).parse().unwrap();
     let gallery_kind: GalleryKind = std::env::var("GALLERY_KIND").unwrap_or("major".to_string()).into();
 
-    let prometheus = PrometheusMetrics::new("api", Some("/metrics"), None);
+    let prometheus = PrometheusMetrics::new("dccrawler", Some("/metrics"), Some(labels!{ "gallery_kind".to_string() => <(&str)>::from(gallery_kind).to_string() }));
     let metrics = Metrics {
         gallery_total: IntGauge::with_opts(opts!("dccrawler_gallery_total", "dccrawler_gallery_total", labels!{ "gallery_kind" => <(&str)>::from(gallery_kind) })).unwrap(),
         worker_report_success_total: IntCounterVec::new(opts!("dccrawler_worker_report_success_total", "dccrawler_worker_report_success_total"), &["gallery_kind", "part"]).unwrap(),
         worker_report_error_total: IntCounterVec::new(opts!("dccrawler_worker_report_error_total", "dccrawler_worker_report_error_total"), &["gallery_kind", "part"]).unwrap(),
+        crawl_waittime_histogram: Histogram::with_opts(
+            HistogramOpts::new(
+                "dccrawler_crawl_waittime_histogram", 
+                "dccrawler_crawl_waittime_histogram")
+            .const_label(
+                "part", 
+                <(&str)>::from(gallery_kind))
+            .buckets(vec![60.0, 300.0, 1800.0, 3600.0, 3600.0*12.0, 3600.0*24.0])
+                ).unwrap(),
+        crawled_document_count_histogram: Histogram::with_opts(
+            HistogramOpts::new(
+                "dccrawler_crawled_document_count_histogram", 
+                "dccrawler_crawled_document_count_histogram")
+            .const_label(
+                "part", 
+                <(&str)>::from(gallery_kind))
+            .buckets(vec![0.0, 5.0, 10.0, 30.0, 100.0, 500.0, 1000.0, 10000.0])
+                ).unwrap(),
     };
 
     let reg = prometheus.clone().registry;
     reg.register(Box::new(metrics.gallery_total.clone())).unwrap();
     reg.register(Box::new(metrics.worker_report_error_total.clone())).unwrap();
     reg.register(Box::new(metrics.worker_report_success_total.clone())).unwrap();
+    reg.register(Box::new(metrics.crawl_waittime_histogram.clone())).unwrap();
+    reg.register(Box::new(metrics.crawled_document_count_histogram.clone())).unwrap();
 
     let db = if store_path.is_empty() {
         let config = sled::Config::new().temporary(true);

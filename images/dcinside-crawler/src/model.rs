@@ -373,7 +373,7 @@ pub struct GalleryState {
     #[serde(default)]
     pub last_error: Option<CrawlerErrorReport>,
     #[serde(default)]
-    pub publish_duration_in_seconds: f32,
+    pub publish_duration_in_seconds: f64,
     #[serde(default)]
     pub last_published_at: Option<DateTime<Utc>>,
 }
