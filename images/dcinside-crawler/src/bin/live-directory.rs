@@ -89,6 +89,8 @@ impl State {
                 last_ranked: now.clone(),
                 last_crawled_at: None,
                 last_crawled_document_id: None,
+                visible: true,
+                last_error: None,
             };
             self.gallery_db.fetch_and_update(new_state.index.id.clone().as_bytes(), move |old| Some(match old {
                 Some(bytes) => {
@@ -130,12 +132,28 @@ impl State {
         }
     }
     fn error_report(&self, form: GalleryCrawlErrorReportForm) -> Result<(), LiveDirectoryError> {
+        let mut found = false;
         self.metrics.worker_report_error_total.with_label_values(&[form.worker_part.to_string().as_str()]).inc();
-        if form.permanent {
-            self.gallery_db.remove(form.id.as_bytes())?;
-            self.metrics.gallery_total.set(self.gallery_db.len().try_into().unwrap());
+        self.gallery_db.fetch_and_update(form.id.as_bytes(), |old| match old {
+            Some(bytes) => {
+                found = true;
+                serde_json::from_slice::<GalleryState>(bytes).map(|mut old_state| {
+                    old_state.last_crawled_at = form.last_crawled_at;
+                    old_state.last_error = Some(form.error.clone());
+                    old_state.visible = match form.error {
+                        CrawlerErrorReport::MinorGalleryClosed | CrawlerErrorReport::MinorGalleryPromoted => false,
+                        _ => true,
+                    };
+                    serde_json::to_vec(&old_state).unwrap()
+                }).ok()
+            }
+            None => None
+        })?;
+        if found {
+            Ok(())
+        } else {
+            Err(LiveDirectoryError::NotFound)
         }
-        Ok(())
     }
 
     fn list_part(&self, total: u64, part: u64) -> Vec<GalleryState> {
@@ -151,7 +169,10 @@ impl State {
             if res.is_err() {
                 error!("fail to parse value during iterate over sled");
             }
-            res.ok()
+            match res {
+                Ok(v) if v.visible => Some(v),
+                _ => None,
+            }
         }).collect()
     }
 }
@@ -186,6 +207,13 @@ async fn list_part(web::Query(query): web::Query<ListPartQuery>, state: web::Dat
 async fn report(web::Json(form): web::Json<GalleryCrawlReportForm>, state: web::Data<State>) -> Result<HttpResponse, LiveDirectoryError> {
     let state = state.clone();
     state.report(form)?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[post("/error-report")]
+async fn error_report(web::Json(form): web::Json<GalleryCrawlErrorReportForm>, state: web::Data<State>) -> Result<HttpResponse, LiveDirectoryError> {
+    let state = state.clone();
+    state.error_report(form)?;
     Ok(HttpResponse::Ok().finish())
 }
 
@@ -329,15 +357,16 @@ mod tests {
     async fn state_error_report() {
         let state = State::new(GalleryKind::Major, Metrics::default());
         state.update().await.unwrap();
-        let res1 = state.list_part(2, 0);
+        let res1 = state.list_part(2, 1);
         assert!(res1[0].last_crawled_at.is_none());
         let now = Utc::now();
         state.error_report(GalleryCrawlErrorReportForm{
             worker_part: 1u64,
             id: res1[0].index.id.clone(),
-            permanent: true,
+            last_crawled_at: Some(now.clone()),
+            error: CrawlerErrorReport::MinorGalleryClosed,
         }).unwrap();
-        let res2 = state.list_part(2, 0);
+        let res2 = state.list_part(2, 1);
         assert_ne!(res1.len(), res2.len());
         assert_ne!(res1[0].index.id, res2[0].index.id);
         assert_eq!(state.metrics.worker_report_error_total.with_label_values(&["1"]).get(), 1);

@@ -66,6 +66,7 @@ pub enum CrawlerError {
     DocumentBodyParseError(#[source] DocumentBodyParseError),
 }
 
+
 #[derive(Error, Debug)]
 pub enum LiveDirectoryError {
     #[error(display = "crawler error")]

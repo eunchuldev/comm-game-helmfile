@@ -167,32 +167,15 @@ impl State {
                 Err(err) => {
                     error!("get index of {} fail: {}", &gallery_state.index.id, err.to_string());
                     metric.gallery_error += 1;
-                    match &err {
-                        CrawlerError::DocumentParseError(DocumentParseError::AdultPage) | 
-                        CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryClosed) |
-                        CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryPromoted) |
-                        CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryAccessNotAllowed) => {
-                            error!("report error");
-                            if let Err(e) = self.error_report(GalleryCrawlErrorReportForm {
-                                worker_part: self.part,
-                                id: gallery_state.index.id.clone(),
-                                permanent: true,
-                            }).await {
-                                error!("error while error report: {}", e.to_string());
-                            };
-                        },
-                        _ => {
-                            error!("report error");
-                            if let Err(e) = self.error_report(GalleryCrawlErrorReportForm {
-                                worker_part: self.part,
-                                id: gallery_state.index.id.clone(),
-                                permanent: false,
-                            }).await {
-                                error!("error while error report: {}", e.to_string());
-                            };
-
-                        }
-                    }
+                    error!("report error");
+                    if let Err(e) = self.error_report(GalleryCrawlErrorReportForm {
+                        worker_part: self.part,
+                        id: gallery_state.index.id.clone(),
+                        error: err.into(),
+                        last_crawled_at: Some(now),
+                    }).await {
+                        error!("error while error report: {}", e.to_string());
+                    };
                 }
             };
         };

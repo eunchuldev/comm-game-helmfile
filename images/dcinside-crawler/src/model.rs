@@ -334,6 +334,8 @@ pub struct GalleryState {
     pub last_ranked: DateTime<Utc>,
     pub last_crawled_at: Option<DateTime<Utc>>,
     pub last_crawled_document_id: Option<usize>,
+    pub visible: bool,
+    pub last_error: Option<CrawlerErrorReport>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -345,10 +347,34 @@ pub struct GalleryCrawlReportForm {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum CrawlerErrorReport {
+    Unknown,
+    AdultPage,
+    MinorGalleryAccessNotAllowed,
+    MinorGalleryClosed,
+    MinorGalleryPromoted,
+}
+
+impl From<&CrawlerError> for CrawlerErrorReport {
+    fn from(err: &CrawlerError) -> Self {
+        match err {
+            CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryPromoted) => CrawlerErrorReport::MinorGalleryPromoted,
+            CrawlerError::DocumentParseError(DocumentParseError::AdultPage) => CrawlerErrorReport::AdultPage,
+            CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryClosed) => CrawlerErrorReport::MinorGalleryClosed,
+            CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryAccessNotAllowed) => CrawlerErrorReport::MinorGalleryAccessNotAllowed,
+            _ => CrawlerErrorReport::Unknown,
+        }
+    }
+}
+
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GalleryCrawlErrorReportForm {
     pub worker_part: u64,
     pub id: String,
-    pub permanent: bool, 
+    pub last_crawled_at: Option<DateTime<Utc>>,
+    pub error: CrawlerErrorReport,
 }
 
 #[cfg(test)]
@@ -443,3 +469,5 @@ mod tests {
         assert_err!(res, Err(DocumentParseError::MinorGalleryClosed));
     }
 }
+
+
