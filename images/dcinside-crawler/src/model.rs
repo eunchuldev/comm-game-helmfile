@@ -197,7 +197,8 @@ pub fn parse_document_indexes(
 ) -> Result<Vec<Result<DocumentIndex, DocumentParseError>>, DocumentParseError> {
     let doc = HTMLDocument::from(body);
 
-    if body.starts_with("<script type=\"text/javascript\">location.replace(\"/error/adault") {
+    
+    if body.starts_with(r#"<script type="text/javascript">location.replace("/error/adult"#) {
         return Err(DocumentParseError::AdultPage);
     } else if body.starts_with("<script type=\"text/javascript\">alert(\"해당 마이너 갤러리는 매니저의 요청으로 폐쇄되었습니다.") {
         return Err(DocumentParseError::MinorGalleryClosed);
@@ -455,6 +456,13 @@ mod tests {
     fn it_parses_document_body() {
         let res = parse_document_body(include_str!("../assets/body.html"), "gallery_id", 1).unwrap();
         assert_eq!(res, "\n\t\t\t\t\t\t\t<p>\'올림픽\' 개최 위해 백신팀 극비리 가동<br><br>전국민 맞고 남을 만큼 확보했지만<br><br>\'국내 1~3차 임상 필수\' 규제에 발목<br><br>\"국산 백신은 왜 없나\" 비판도 일어<br><br>백신을 빨리 확보했음에도, 정작 접종시기는 2월말 - 한국과 차이 X<br><br>일본은 국내 임상 1,2,3차를 거쳐야 하는데, 모더나는 1월경 임상시험에 들어간다고 발표, 그러나 언제 접종할 지에 대해선 타임라인 제시 X</p><p><br></p><p><br></p><p style=\"text-align:left;\"><img src=\"https://dcimg8.dcinside.co.kr/viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a8551648461846084596f34596bb9e7a7968b67c\" style=\"cursor:pointer;\" onclick=\"javascript:imgPop(\'https://image.dcinside.com/viewimagePop.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364ad33fbacc76da4d6aa29c4891b49fe3513541273923ef18\',\'image\',\'fullscreen=yes,scrollbars=yes,resizable=no,menubar=no,toolbar=no,location=no,status=no\');\" alt=\"viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a8551648461846084596f34596bb9e7a7968b67c\"></p><p style=\"text-align:left;\">18시 현재 6,055명 (도쿄 1,494명 )<br><br>일요일 기준 최고치 갱신 중<br></p><p><br></p><p style=\"text-align:left;\"><img src=\"https://dcimg8.dcinside.co.kr/viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a85516484618460810c0a219c177961ee0f408ae\" style=\"cursor:pointer;\" onclick=\"javascript:imgPop(\'https://image.dcinside.com/viewimagePop.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364ad33fbacc76da4d6aa29c48c4e2cebf0663432839231131\',\'image\',\'fullscreen=yes,scrollbars=yes,resizable=no,menubar=no,toolbar=no,location=no,status=no\');\" alt=\"viewimage.php?id=3dafdf21f7d335ab67b1d1&amp;no=24b0d769e1d32ca73dec87fa11d0283123a3619b5f9530e0a1306168e0dcca0e8d266e8bd0d7e56ed9364a956febc71a78fb28a85516484618460810c0a219c177961ee0f408ae\"></p><p><br></p>\t\t\t\t\t\t\t\t".to_string());
+    }
+
+    #[test]
+    fn it_parses_adults() {
+        let html = r#"<script type="text/javascript">location.replace("/error/adult/?s_url=https%3A%2F%2Fgall.dcinside.com%2Fmgallery%2Fboard%2Flists%3Fid%3Donahole%26list_num%3D100%26page%3D2");</script>"#;
+        let res = parse_document_indexes(html, "gallery_id");
+        assert_err!(res, Err(DocumentParseError::AdultPage));
     }
 
     #[test]

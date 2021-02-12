@@ -218,7 +218,7 @@ async fn error_report(web::Json(form): web::Json<GalleryCrawlErrorReportForm>, s
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(health).service(list_part).service(report);
+    cfg.service(health).service(list_part).service(report).service(error_report);
 }
 
 #[derive(Clone)]
