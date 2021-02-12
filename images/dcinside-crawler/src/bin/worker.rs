@@ -1,12 +1,13 @@
-
-use actix_web::{get, post, web, App, HttpServer, HttpResponse, Responder, error::ResponseError, http::StatusCode};
+use actix_web::{
+    error::ResponseError, get, http::StatusCode, post, web, App, HttpResponse, HttpServer,
+    Responder,
+};
 use std::time::Duration;
 
-use err_derive::Error;
 use dcinside_crawler::error::*;
+use err_derive::Error;
 
 use std::convert::TryInto;
-
 
 use dcinside_crawler::crawler::Crawler;
 use dcinside_crawler::model::*;
@@ -14,9 +15,9 @@ use dcinside_crawler::model::*;
 use serde::Serialize;
 
 use actix_web_prom::PrometheusMetrics;
-use prometheus::{IntGauge};
+use prometheus::IntGauge;
 
-use log::{info, error};
+use log::{error, info};
 
 use actix_web::client::{PayloadError, SendRequestError};
 
@@ -36,8 +37,8 @@ pub enum WorkerError {
 
 #[derive(Serialize)]
 pub struct ListPartQuery {
-   part: u64,
-   total: u64,
+    part: u64,
+    total: u64,
 }
 
 #[derive(Clone)]
@@ -60,12 +61,7 @@ struct ResultMetric {
     comment_error: usize,
 }
 impl State {
-    fn new(
-        live_directory_url: &str, 
-        data_broker_url: &str, 
-        total: u64,
-        part: u64) 
-        -> Self { 
+    fn new(live_directory_url: &str, data_broker_url: &str, total: u64, part: u64) -> Self {
         State {
             crawler: Crawler::new(),
             live_directory_url: live_directory_url.to_string(),
@@ -75,14 +71,38 @@ impl State {
             start_page: 2,
         }
     }
-    fn crawler_delay(mut self, v: u64) -> Self { self.crawler = self.crawler.delay(v); self }
-    fn start_page(mut self, v: usize) -> Self { self.start_page = v; self }
+    fn crawler_delay(mut self, v: u64) -> Self {
+        self.crawler = self.crawler.delay(v);
+        self
+    }
+    fn start_page(mut self, v: usize) -> Self {
+        self.start_page = v;
+        self
+    }
     async fn fetch_gallery_list(&self) -> Result<Vec<GalleryState>, WorkerError> {
-        let bytes = self.crawler.client.get(format!("{}/list", self.live_directory_url)).query(&ListPartQuery{ total: self.total, part: self.part }).unwrap().send().await?.body().limit(1024*1024*8).await?;
+        let bytes = self
+            .crawler
+            .client
+            .get(format!("{}/list", self.live_directory_url))
+            .query(&ListPartQuery {
+                total: self.total,
+                part: self.part,
+            })
+            .unwrap()
+            .send()
+            .await?
+            .body()
+            .limit(1024 * 1024 * 8)
+            .await?;
         Ok(serde_json::from_slice(&bytes)?)
     }
     async fn error_report(&self, form: GalleryCrawlErrorReportForm) -> Result<(), WorkerError> {
-        let res = self.crawler.client.post(format!("{}/error-report", self.live_directory_url)).send_json(&form).await?;
+        let res = self
+            .crawler
+            .client
+            .post(format!("{}/error-report", self.live_directory_url))
+            .send_json(&form)
+            .await?;
         if res.status() == StatusCode::OK {
             Ok(())
         } else {
@@ -90,7 +110,12 @@ impl State {
         }
     }
     async fn report_success(&self, form: GalleryCrawlReportForm) -> Result<(), WorkerError> {
-        let res = self.crawler.client.post(format!("{}/report", self.live_directory_url)).send_json(&form).await?;
+        let res = self
+            .crawler
+            .client
+            .post(format!("{}/report", self.live_directory_url))
+            .send_json(&form)
+            .await?;
         if res.status() == StatusCode::OK {
             Ok(())
         } else {
@@ -98,7 +123,12 @@ impl State {
         }
     }
     async fn send_data(&self, data: &Document) -> Result<(), WorkerError> {
-        let res = self.crawler.client.post(&self.data_broker_url).send_json(data).await?;
+        let res = self
+            .crawler
+            .client
+            .post(&self.data_broker_url)
+            .send_json(data)
+            .await?;
         if res.status() == StatusCode::OK {
             Ok(())
         } else {
@@ -116,19 +146,33 @@ impl State {
             (None, None) => std::cmp::Ordering::Equal,
         });
         for (i, gallery_state) in gallery_states.into_iter().enumerate() {
-            info!("{}/{} start | {}(last crawled at {:?})", i, len, gallery_state.index.id, gallery_state.last_crawled_at);
+            info!(
+                "{}/{} start | {}(last crawled at {:?})",
+                i, len, gallery_state.index.id, gallery_state.last_crawled_at
+            );
             let now = chrono::Utc::now();
-            let res = match gallery_state.last_crawled_document_id { 
-                Some(last_crawled_document_id) if last_crawled_document_id > 0 => 
-                    self.crawler.documents_after(&gallery_state.index, last_crawled_document_id, self.start_page).await,
-                _ => 
-                    self.crawler.documents(&gallery_state.index, self.start_page).await
+            let res = match gallery_state.last_crawled_document_id {
+                Some(last_crawled_document_id) if last_crawled_document_id > 0 => {
+                    self.crawler
+                        .documents_after(
+                            &gallery_state.index,
+                            last_crawled_document_id,
+                            self.start_page,
+                        )
+                        .await
+                }
+                _ => {
+                    self.crawler
+                        .documents(&gallery_state.index, self.start_page)
+                        .await
+                }
             };
             match &res {
                 Ok(res) => {
                     info!("crawled documents: {}", res.len());
                     metric.gallery_success += 1;
-                    let mut last_document_id = gallery_state.last_crawled_document_id.unwrap_or(0usize);
+                    let mut last_document_id =
+                        gallery_state.last_crawled_document_id.unwrap_or(0usize);
                     for r in res {
                         match r {
                             Ok(doc) => {
@@ -140,46 +184,72 @@ impl State {
                                 if let Err(e) = self.send_data(doc).await {
                                     error!("error while send data: {}", e.to_string());
                                 }
-                            },
+                            }
                             Err(CrawlerError::DocumentParseError(err)) => {
-                                error!("document parse error of {}: {}", &gallery_state.index.id, err.to_string());
+                                error!(
+                                    "document parse error of {}: {}",
+                                    &gallery_state.index.id,
+                                    err.to_string()
+                                );
                                 metric.document_error += 1;
-                            },
+                            }
                             Err(CrawlerError::CommentParseError(err)) => {
-                                error!("coments parse error of {}: {}", &gallery_state.index.id, err.to_string());
+                                error!(
+                                    "coments parse error of {}: {}",
+                                    &gallery_state.index.id,
+                                    err.to_string()
+                                );
                                 metric.comment_error += 1;
-                            },
+                            }
                             Err(err) => {
-                                error!("document crawl of {}: {}", &gallery_state.index.id, err.to_string());
+                                error!(
+                                    "document crawl of {}: {}",
+                                    &gallery_state.index.id,
+                                    err.to_string()
+                                );
                                 metric.document_error += 1;
                             }
                         };
                     }
-                    if let Err(e) = self.report_success(GalleryCrawlReportForm {
-                        id: gallery_state.index.id.clone(),
-                        worker_part: self.part,
-                        last_crawled_at: Some(now),
-                        last_crawled_document_id: if last_document_id > 0 { Some(last_document_id) } else { None },
-                        crawled_document_count: res.len(),
-                    }).await {
+                    if let Err(e) = self
+                        .report_success(GalleryCrawlReportForm {
+                            id: gallery_state.index.id.clone(),
+                            worker_part: self.part,
+                            last_crawled_at: Some(now),
+                            last_crawled_document_id: if last_document_id > 0 {
+                                Some(last_document_id)
+                            } else {
+                                None
+                            },
+                            crawled_document_count: res.len(),
+                        })
+                        .await
+                    {
                         error!("error while report: {}", e.to_string());
                     };
                 }
                 Err(err) => {
-                    error!("get index of {} fail: {}", &gallery_state.index.id, err.to_string());
+                    error!(
+                        "get index of {} fail: {}",
+                        &gallery_state.index.id,
+                        err.to_string()
+                    );
                     metric.gallery_error += 1;
                     error!("report error");
-                    if let Err(e) = self.error_report(GalleryCrawlErrorReportForm {
-                        worker_part: self.part,
-                        id: gallery_state.index.id.clone(),
-                        error: err.into(),
-                        last_crawled_at: Some(now),
-                    }).await {
+                    if let Err(e) = self
+                        .error_report(GalleryCrawlErrorReportForm {
+                            worker_part: self.part,
+                            id: gallery_state.index.id.clone(),
+                            error: err.into(),
+                            last_crawled_at: Some(now),
+                        })
+                        .await
+                    {
                         error!("error while error report: {}", e.to_string());
                     };
                 }
             };
-        };
+        }
         Ok(metric)
     }
 }
@@ -193,21 +263,36 @@ struct ResultMetricGauges {
     document_error: IntGauge,
     comment_error: IntGauge,
 }
-async fn crawl_forever(mut state: State, delay: Duration, gauges: ResultMetricGauges) -> Result<(), WorkerError> {
+async fn crawl_forever(
+    mut state: State,
+    delay: Duration,
+    gauges: ResultMetricGauges,
+) -> Result<(), WorkerError> {
     loop {
         let metric = state.run().await?;
-        gauges.gallery_success.set(metric.gallery_success.try_into().unwrap()); 
-        gauges.document_success.set(metric.document_success.try_into().unwrap()); 
-        gauges.comment_success.set(metric.comment_success.try_into().unwrap()); 
-        gauges.gallery_error.set(metric.gallery_error.try_into().unwrap()); 
-        gauges.document_error.set(metric.document_error.try_into().unwrap()); 
-        gauges.comment_error.set(metric.comment_error.try_into().unwrap()); 
+        gauges
+            .gallery_success
+            .set(metric.gallery_success.try_into().unwrap());
+        gauges
+            .document_success
+            .set(metric.document_success.try_into().unwrap());
+        gauges
+            .comment_success
+            .set(metric.comment_success.try_into().unwrap());
+        gauges
+            .gallery_error
+            .set(metric.gallery_error.try_into().unwrap());
+        gauges
+            .document_error
+            .set(metric.document_error.try_into().unwrap());
+        gauges
+            .comment_error
+            .set(metric.comment_error.try_into().unwrap());
         info!("crawl done. wait {} milli seconds..", delay.as_millis());
         actix::clock::delay_for(delay).await;
     }
     Ok(())
 }
-
 
 #[get("/health")]
 async fn health() -> impl Responder {
@@ -228,9 +313,18 @@ async fn main() -> std::io::Result<()> {
     let data_broker_url = std::env::var("DATA_BROKER_URL").expect("DATA_BROKER_URL");
 
     let part: u64 = std::env::var("PART").expect("PART").parse().expect("PART");
-    let total: u64 = std::env::var("TOTAL").expect("TOTAL").parse().expect("TOTAL");
-    let delay: u64 = std::env::var("DELAY").unwrap_or("100".to_string()).parse().expect("DELAY");
-    let sleep_duration: u64 = std::env::var("SLEEP_DURATION").unwrap_or("6000".to_string()).parse().expect("SLEEP_DURATION");
+    let total: u64 = std::env::var("TOTAL")
+        .expect("TOTAL")
+        .parse()
+        .expect("TOTAL");
+    let delay: u64 = std::env::var("DELAY")
+        .unwrap_or("100".to_string())
+        .parse()
+        .expect("DELAY");
+    let sleep_duration: u64 = std::env::var("SLEEP_DURATION")
+        .unwrap_or("6000".to_string())
+        .parse()
+        .expect("SLEEP_DURATION");
 
     let prometheus = PrometheusMetrics::new("api", Some("/metrics"), None);
     let metrics = ResultMetricGauges {
@@ -243,46 +337,43 @@ async fn main() -> std::io::Result<()> {
     };
 
     let reg = prometheus.clone().registry;
-    reg.register(Box::new(metrics.gallery_success.clone())).unwrap();
-    reg.register(Box::new(metrics.gallery_error.clone())).unwrap();
-    reg.register(Box::new(metrics.document_success.clone())).unwrap();
-    reg.register(Box::new(metrics.document_error.clone())).unwrap();
-    reg.register(Box::new(metrics.comment_success.clone())).unwrap();
-    reg.register(Box::new(metrics.comment_error.clone())).unwrap();
+    reg.register(Box::new(metrics.gallery_success.clone()))
+        .unwrap();
+    reg.register(Box::new(metrics.gallery_error.clone()))
+        .unwrap();
+    reg.register(Box::new(metrics.document_success.clone()))
+        .unwrap();
+    reg.register(Box::new(metrics.document_error.clone()))
+        .unwrap();
+    reg.register(Box::new(metrics.comment_success.clone()))
+        .unwrap();
+    reg.register(Box::new(metrics.comment_error.clone()))
+        .unwrap();
 
-    actix_rt::spawn(async move { 
+    actix_rt::spawn(async move {
         loop {
-            let state = State::new(
-                &live_directory_url, 
-                &data_broker_url,
-                total,
-                part)
-                .crawler_delay(delay);
+            let state =
+                State::new(&live_directory_url, &data_broker_url, total, part).crawler_delay(delay);
             let res = crawl_forever(
-                state, 
-                Duration::from_millis(sleep_duration), 
-                metrics.clone()).await;
+                state,
+                Duration::from_millis(sleep_duration),
+                metrics.clone(),
+            )
+            .await;
             if let Err(e) = res {
                 error!("crawler restart due to: {}", e.to_string());
             }
         }
     });
-    HttpServer::new(move || {
-        App::new()
-            .wrap(prometheus.clone())
-            .configure(config)
-    })
+    HttpServer::new(move || App::new().wrap(prometheus.clone()).configure(config))
         .bind(format!("0.0.0.0:{}", port))?
         .workers(1)
         .run()
         .await
 }
 
-
 #[cfg(test)]
 mod tests {
-    
-    
 
     /*
     #[actix_rt::test]

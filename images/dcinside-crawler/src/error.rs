@@ -1,6 +1,5 @@
-use err_derive::Error;
 use actix_web::client::{PayloadError, SendRequestError};
-
+use err_derive::Error;
 
 #[derive(Error, Debug)]
 pub enum DocumentParseError {
@@ -10,7 +9,7 @@ pub enum DocumentParseError {
     NumberParse { path: &'static str },
     #[error(display = "fail to parse `{}`", path)]
     DatetimeParse { path: &'static str },
-    #[error(display = "fail to parse" )]
+    #[error(display = "fail to parse")]
     JsonParse(#[source] serde_json::Error),
     #[error(display = "need adult auth")]
     AdultPage,
@@ -19,7 +18,7 @@ pub enum DocumentParseError {
     #[error(display = "minor gallery become major gallery")]
     MinorGalleryPromoted,
     #[error(display = "minor gallery access not allowed")]
-    MinorGalleryAccessNotAllowed
+    MinorGalleryAccessNotAllowed,
 }
 
 #[derive(Error, Debug)]
@@ -30,11 +29,17 @@ pub enum CommentParseError {
     NumberParse { path: &'static str },
     #[error(display = "fail to parse `{}`", path)]
     DatetimeParse { path: &'static str },
-    #[error(display = "fail to parse at {}.{} due to {}. body: {}", gallery_id, doc_id, source, target )]
-    JsonParse{
+    #[error(
+        display = "fail to parse at {}.{} due to {}. body: {}",
+        gallery_id,
+        doc_id,
+        source,
+        target
+    )]
+    JsonParse {
         source: serde_json::Error,
         target: String,
-        doc_id: usize, 
+        doc_id: usize,
         gallery_id: String,
     },
 }
@@ -65,7 +70,6 @@ pub enum CrawlerError {
     #[error(display = "fail to parse body: {}", _0)]
     DocumentBodyParseError(#[source] DocumentBodyParseError),
 }
-
 
 #[derive(Error, Debug)]
 pub enum LiveDirectoryError {
