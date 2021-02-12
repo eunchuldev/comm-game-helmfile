@@ -95,7 +95,7 @@ impl State {
                 last_crawled_document_id: None,
                 visible: true,
                 last_error: None,
-                publish_duration_in_seconds: 0.0,
+                publish_duration_in_seconds: Some(0.0),
             };
             self.gallery_db.fetch_and_update(
                 new_state.index.id.clone().as_bytes(),
@@ -146,14 +146,14 @@ impl State {
                     serde_json::from_slice::<GalleryState>(bytes)
                         .map(|mut old_state| {
                             old_state.publish_duration_in_seconds =
-                                match (form.last_crawled_at, old_state.last_published_at) {
+                                Some(match (form.last_crawled_at, old_state.last_published_at) {
                                     (Some(n), Some(o)) => {
                                         (n.signed_duration_since(o).num_seconds() as f64)
                                             / (form.crawled_document_count as f64)
                                     }
                                     (Some(n), _) => 0.0f64,
                                     _ => 0.0f64,
-                                };
+                                });
                             if form.crawled_document_count > 0
                                 || old_state.last_published_at.is_none()
                             {
@@ -230,7 +230,7 @@ impl State {
                         Some(t) => {
                             let duration_from_last_publish =
                                 now.signed_duration_since(t).num_seconds() as f64;
-                            let wait_time = (v.publish_duration_in_seconds * 1.0)
+                            let wait_time = (v.publish_duration_in_seconds.unwrap_or(0.0) * 1.0)
                                 .min(duration_from_last_publish)
                                 .min(3600.0 * 24.0);
                             self.metrics.crawl_waittime_histogram.observe(wait_time);
