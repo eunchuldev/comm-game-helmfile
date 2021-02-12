@@ -88,9 +88,11 @@ impl State {
                 index,
                 last_ranked: now.clone(),
                 last_crawled_at: None,
+                last_published_at: None,
                 last_crawled_document_id: None,
                 visible: true,
                 last_error: None,
+                publish_duration_in_seconds: 0.0,
             };
             self.gallery_db.fetch_and_update(new_state.index.id.clone().as_bytes(), move |old| Some(match old {
                 Some(bytes) => {
@@ -119,6 +121,14 @@ impl State {
             Some(bytes) => {
                 found = true;
                 serde_json::from_slice::<GalleryState>(bytes).map(|mut old_state| {
+                    old_state.publish_duration_in_seconds = match (form.last_crawled_at, old_state.last_published_at) {
+                        (Some(n), Some(o)) => (n.signed_duration_since(o).num_seconds() as f32) / (form.crawled_document_count as f32),
+                        (Some(n), _) => 0.0,
+                        _ => 0.0,
+                    };
+                    if form.crawled_document_count > 0 || old_state.last_published_at.is_none() {
+                        old_state.last_published_at = form.last_crawled_at;
+                    }
                     old_state.last_crawled_at = form.last_crawled_at;
                     old_state.last_crawled_document_id = form.last_crawled_document_id;
                     serde_json::to_vec(&old_state).unwrap()
@@ -141,7 +151,7 @@ impl State {
                 serde_json::from_slice::<GalleryState>(bytes).map(|mut old_state| {
                     old_state.last_error = Some(form.error.clone());
                     old_state.visible = match form.error {
-                        CrawlerErrorReport::MinorGalleryClosed | CrawlerErrorReport::MinorGalleryPromoted => false,
+                        CrawlerErrorReport::MinorGalleryClosed | CrawlerErrorReport::MinorGalleryPromoted | CrawlerErrorReport::AdultPage => false,
                         _ => true,
                     };
                     serde_json::to_vec(&old_state).unwrap()
@@ -157,6 +167,7 @@ impl State {
     }
 
     fn list_part(&self, total: u64, part: u64) -> Vec<GalleryState> {
+        let now = Utc::now();
         self.gallery_db.iter().filter_map(|res| {
             if res.is_err() {
                 error!("fail to iterate over sled");
@@ -170,7 +181,21 @@ impl State {
                 error!("fail to parse value during iterate over sled");
             }
             match res {
-                Ok(v) if v.visible => Some(v),
+                Ok(v) if v.visible => 
+                    match v.last_published_at {
+                        Some(t) => {
+                            let duration_from_last_publish = now.signed_duration_since(t).num_seconds() as f32;
+                            let wait_time = (v.publish_duration_in_seconds*1.0)
+                                .min(duration_from_last_publish)
+                                .min(3600.0);
+                            if duration_from_last_publish >= wait_time {
+                                Some(v)
+                            } else {
+                                None
+                            }
+                        }
+                        None => Some(v),
+                    },
                 _ => None,
             }
         }).collect()
@@ -331,17 +356,18 @@ mod tests {
         let state = State::new(GalleryKind::Major, Metrics::default());
         state.update().await.unwrap();
         let res1 = state.list_part(2, 0);
-        assert!(res1[0].last_crawled_at.is_none());
+        assert!(res1[1].last_crawled_at.is_none());
         let now = Utc::now();
         state.report(GalleryCrawlReportForm{
             worker_part: 1u64,
             id: res1[0].index.id.clone(),
             last_crawled_at: Some(now.clone()),
             last_crawled_document_id: Some(1),
+            crawled_document_count: 1usize,
         }).unwrap();
-        let res1 = state.list_part(2, 0);
-        assert_eq!(res1[0].last_crawled_at, Some(now));
-        assert_eq!(res1[0].last_crawled_document_id, Some(1));
+        let res2 = state.list_part(2, 0);
+        assert_eq!(res2[0].last_crawled_at, Some(now));
+        assert_eq!(res2[0].last_crawled_document_id, Some(1));
         assert_eq!(state.metrics.worker_report_success_total.with_label_values(&["major", "1"]).get(), 1);
     }
     #[actix_rt::test]

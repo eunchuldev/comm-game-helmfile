@@ -160,6 +160,7 @@ impl State {
                         worker_part: self.part,
                         last_crawled_at: Some(now),
                         last_crawled_document_id: if last_document_id > 0 { Some(last_document_id) } else { None },
+                        crawled_document_count: res.len(),
                     }).await {
                         error!("error while report: {}", e.to_string());
                     };

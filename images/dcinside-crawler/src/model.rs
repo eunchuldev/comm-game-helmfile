@@ -1,7 +1,7 @@
 use crate::error::*;
 
 
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc, Datelike};
+use chrono::{Duration, DateTime, NaiveDateTime, TimeZone, Utc, Datelike};
 use serde::{Deserialize, Serialize, Deserializer};
 
 use select::document::Document as HTMLDocument;
@@ -372,6 +372,10 @@ pub struct GalleryState {
     pub visible: bool,
     #[serde(default)]
     pub last_error: Option<CrawlerErrorReport>,
+    #[serde(default)]
+    pub publish_duration_in_seconds: f32,
+    #[serde(default)]
+    pub last_published_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -380,6 +384,7 @@ pub struct GalleryCrawlReportForm {
     pub id: String,
     pub last_crawled_at: Option<DateTime<Utc>>,
     pub last_crawled_document_id: Option<usize>,
+    pub crawled_document_count: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
