@@ -1,7 +1,10 @@
 use crate::error::*;
 use crate::model::*;
 
-use actix_web::client::{Client, ClientBuilder};
+use actix_web::{
+    client::{Client, ClientBuilder},
+    http::StatusCode,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -423,19 +426,24 @@ impl<'a> Crawler {
         let (e_s_n_o, res) = back_off!(
             1000,
             1000 * 10,
-            CrawlerError::DocumentParseError(DocumentParseError::AdultPage)
+            CrawlerError::PageNotFound 
+                | CrawlerError::DocumentParseError(DocumentParseError::AdultPage)
                 | CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryClosed)
                 | CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryPromoted)
                 | CrawlerError::DocumentParseError(
                     DocumentParseError::MinorGalleryAccessNotAllowed
-                ),
+                    ),
             || async {
-                let bytes = self
+                let mut res = self
                     .client
                     .get(path.as_str())
                     .header("Referer", "https://gall.dcinside.com/")
                     .send()
-                    .await?
+                    .await?;
+                if res.status() == StatusCode::NOT_FOUND {
+                    return Err(CrawlerError::PageNotFound);
+                }
+                let bytes = res
                     .body()
                     .limit(1024 * 1024 * 8)
                     .await?;

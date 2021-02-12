@@ -63,6 +63,8 @@ pub enum CrawlerError {
     Fmt(#[source] core::fmt::Error),
     #[error(display = "utf8: {}", _0)]
     Utf8(#[source] std::str::Utf8Error),
+    #[error(display = "page not found(404)")]
+    PageNotFound,
     #[error(display = "fail to parse root page: {}", _0)]
     DocumentParseError(#[source] DocumentParseError),
     #[error(display = "fail to parse comment: {}", _0)]

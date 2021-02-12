@@ -498,6 +498,7 @@ pub enum CrawlerErrorReport {
     MinorGalleryAccessNotAllowed,
     MinorGalleryClosed,
     MinorGalleryPromoted,
+    PageNotFound,
 }
 
 impl From<&CrawlerError> for CrawlerErrorReport {
@@ -515,6 +516,7 @@ impl From<&CrawlerError> for CrawlerErrorReport {
             CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryAccessNotAllowed) => {
                 CrawlerErrorReport::MinorGalleryAccessNotAllowed
             }
+            CrawlerError::PageNotFound => CrawlerErrorReport::PageNotFound,
             _ => CrawlerErrorReport::Unknown,
         }
     }

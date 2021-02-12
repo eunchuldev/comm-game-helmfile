@@ -190,7 +190,8 @@ impl State {
                         .map(|mut old_state| {
                             old_state.last_error = Some(form.error.clone());
                             old_state.visible = match form.error {
-                                CrawlerErrorReport::MinorGalleryClosed
+                                CrawlerErrorReport::PageNotFound
+                                | CrawlerErrorReport::MinorGalleryClosed
                                 | CrawlerErrorReport::MinorGalleryPromoted
                                 | CrawlerErrorReport::AdultPage => false,
                                 _ => true,
