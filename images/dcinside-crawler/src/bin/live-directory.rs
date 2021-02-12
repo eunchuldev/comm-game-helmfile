@@ -101,6 +101,7 @@ impl State {
                     });
                     old_state.last_ranked = now.clone();
                     old_state.index = new_index;
+                    old_state.visible = true;
                     serde_json::to_vec(&old_state).unwrap()
                 },
                 None => {

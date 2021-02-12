@@ -328,13 +328,17 @@ pub fn parse_comments(
     }
 }
 
+fn default_as_true() -> bool {
+    true
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GalleryState {
     pub index: GalleryIndex,
     pub last_ranked: DateTime<Utc>,
     pub last_crawled_at: Option<DateTime<Utc>>,
     pub last_crawled_document_id: Option<usize>,
-    #[serde(default = "true")]
+    #[serde(default = "default_as_true")]
     pub visible: bool,
     #[serde(default)]
     pub last_error: Option<CrawlerErrorReport>,
