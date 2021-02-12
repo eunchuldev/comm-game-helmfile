@@ -114,7 +114,7 @@ impl State {
     }
     fn report(&self, form: GalleryCrawlReportForm) -> Result<(), LiveDirectoryError> {
         let mut found = false;
-        self.metrics.worker_report_success_total.with_label_values(&[form.worker_part.to_string().as_str()]).inc();
+        self.metrics.worker_report_success_total.with_label_values(&[self.gallery_kind.into(), form.worker_part.to_string().as_str()]).inc();
         self.gallery_db.fetch_and_update(form.id.as_bytes(), |old| match old {
             Some(bytes) => {
                 found = true;
@@ -134,7 +134,7 @@ impl State {
     }
     fn error_report(&self, form: GalleryCrawlErrorReportForm) -> Result<(), LiveDirectoryError> {
         let mut found = false;
-        self.metrics.worker_report_error_total.with_label_values(&[form.worker_part.to_string().as_str()]).inc();
+        self.metrics.worker_report_error_total.with_label_values(&[self.gallery_kind.into(), form.worker_part.to_string().as_str()]).inc();
         self.gallery_db.fetch_and_update(form.id.as_bytes(), |old| match old {
             Some(bytes) => {
                 found = true;
@@ -232,8 +232,8 @@ impl Default for Metrics {
     fn default() -> Self {
         Metrics{
             gallery_total: IntGauge::new("dccrawler_gallery_total", "dccrawler_gallery_total").unwrap(),
-            worker_report_success_total: IntCounterVec::new(opts!("dccrawler_worker_report_success_total", "dccrawler_worker_report_success_total"), &["part"]).unwrap(),
-            worker_report_error_total: IntCounterVec::new(opts!("dccrawler_worker_report_error_total", "dccrawler_worker_report_error_total"), &["part"]).unwrap(),
+            worker_report_success_total: IntCounterVec::new(opts!("dccrawler_worker_report_success_total", "dccrawler_worker_report_success_total"), &["gallery_kind", "part"]).unwrap(),
+            worker_report_error_total: IntCounterVec::new(opts!("dccrawler_worker_report_error_total", "dccrawler_worker_report_error_total"), &["gallery_kind", "part"]).unwrap(),
         }
     }
 }
@@ -246,22 +246,13 @@ async fn main() -> std::io::Result<()> {
     let port = std::env::var("PORT").unwrap_or("8080".to_string());
     let store_path = std::env::var("STORE_PATH").unwrap_or("".to_string());
     let total_worker_count: u64 = std::env::var("TOTAL_WORKER_COUNT").unwrap_or("30".to_string()).parse().unwrap();
-    let gallery_kind = match std::env::var("GALLERY_KIND").unwrap_or("major".to_string()).as_ref() {
-        "major" => GalleryKind::Major,
-        "minor" => GalleryKind::Minor,
-        "mini" => GalleryKind::Mini,
-        _ => panic!("unsupported gallery kind"),
-    };
+    let gallery_kind: GalleryKind = std::env::var("GALLERY_KIND").unwrap_or("major".to_string()).into();
 
     let prometheus = PrometheusMetrics::new("api", Some("/metrics"), None);
     let metrics = Metrics {
-        gallery_total: IntGauge::with_opts(opts!("dccrawler_gallery_total", "dccrawler_gallery_total", match gallery_kind {
-            GalleryKind::Major => labels!{ "gallery_kind" => "major" },
-            GalleryKind::Minor => labels!{ "gallery_kind" => "minor" },
-            GalleryKind::Mini => labels!{ "gallery_kind" => "mini" },
-        })).unwrap(),
-        worker_report_success_total: IntCounterVec::new(opts!("dccrawler_worker_report_success_total", "dccrawler_worker_report_success_total"), &["part"]).unwrap(),
-        worker_report_error_total: IntCounterVec::new(opts!("dccrawler_worker_report_error_total", "dccrawler_worker_report_error_total"), &["part"]).unwrap(),
+        gallery_total: IntGauge::with_opts(opts!("dccrawler_gallery_total", "dccrawler_gallery_total", labels!{ "gallery_kind" => <(&str)>::from(gallery_kind) })).unwrap(),
+        worker_report_success_total: IntCounterVec::new(opts!("dccrawler_worker_report_success_total", "dccrawler_worker_report_success_total"), &["gallery_kind", "part"]).unwrap(),
+        worker_report_error_total: IntCounterVec::new(opts!("dccrawler_worker_report_error_total", "dccrawler_worker_report_error_total"), &["gallery_kind", "part"]).unwrap(),
     };
 
     let reg = prometheus.clone().registry;
@@ -351,7 +342,7 @@ mod tests {
         let res1 = state.list_part(2, 0);
         assert_eq!(res1[0].last_crawled_at, Some(now));
         assert_eq!(res1[0].last_crawled_document_id, Some(1));
-        assert_eq!(state.metrics.worker_report_success_total.with_label_values(&["1"]).get(), 1);
+        assert_eq!(state.metrics.worker_report_success_total.with_label_values(&["major", "1"]).get(), 1);
     }
     #[actix_rt::test]
     async fn state_error_report() {
@@ -369,7 +360,7 @@ mod tests {
         let res2 = state.list_part(2, 1);
         assert_ne!(res1.len(), res2.len());
         assert_ne!(res1[0].index.id, res2[0].index.id);
-        assert_eq!(state.metrics.worker_report_error_total.with_label_values(&["1"]).get(), 1);
+        assert_eq!(state.metrics.worker_report_error_total.with_label_values(&["major", "1"]).get(), 1);
     }
 
     #[actix_rt::test]

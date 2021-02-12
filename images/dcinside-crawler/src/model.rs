@@ -20,6 +20,35 @@ impl Default for GalleryKind {
         GalleryKind::Major
     }
 }
+impl From<&str> for GalleryKind {
+    fn from(s: &str) -> Self {
+        match s {
+            "major" => GalleryKind::Major,
+            "minor" => GalleryKind::Minor,
+            "mini" => GalleryKind::Mini,
+            _ => panic!("unsupported gallery kind"),
+        }
+    }
+}
+impl From<String> for GalleryKind {
+    fn from(s: String) -> Self {
+        match s.as_ref() {
+            "major" => GalleryKind::Major,
+            "minor" => GalleryKind::Minor,
+            "mini" => GalleryKind::Mini,
+            _ => panic!("unsupported gallery kind"),
+        }
+    }
+}
+impl From<GalleryKind> for &'static str {
+    fn from(k: GalleryKind) -> &'static str {
+        match k {
+            GalleryKind::Major => "major",
+            GalleryKind::Minor => "minor",
+            GalleryKind::Mini => "mini",
+        }
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Copy, Clone)]
 pub enum DocumentKind {
