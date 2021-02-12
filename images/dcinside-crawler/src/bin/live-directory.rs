@@ -138,7 +138,6 @@ impl State {
             Some(bytes) => {
                 found = true;
                 serde_json::from_slice::<GalleryState>(bytes).map(|mut old_state| {
-                    old_state.last_crawled_at = form.last_crawled_at;
                     old_state.last_error = Some(form.error.clone());
                     old_state.visible = match form.error {
                         CrawlerErrorReport::MinorGalleryClosed | CrawlerErrorReport::MinorGalleryPromoted => false,
