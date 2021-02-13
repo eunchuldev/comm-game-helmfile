@@ -115,6 +115,7 @@ impl State {
                             old_state.index = new_index;
                             old_state.visible = true;
                             old_state.last_published_at = None;
+                            old_state.publish_duration_in_seconds = None;
                             serde_json::to_vec(&old_state).unwrap()
                         }
                         None => serde_json::to_vec(&new_state).unwrap(),
