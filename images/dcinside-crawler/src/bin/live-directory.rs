@@ -141,7 +141,35 @@ impl State {
             .crawled_document_count_histogram
             .observe(form.crawled_document_count as f64);
         if form.crawled_document_count >= 500 {
-            warn!("too many crawled documents: `{}` documents crawled from `{}` gallery", form.crawled_document_count, form.id);
+            match self.gallery_db.get(form.id.as_bytes()) {
+                Ok(Some(bytes)) => {
+                    match serde_json::from_slice::<GalleryState>(&bytes) {
+                        Ok(state) =>  {
+                            warn!(
+                                "[{} gallery] too many crawled documents: `{}` documents crawled. last published at `{}`, publish duration: `{}` secs", 
+                                form.id,
+                                form.crawled_document_count, 
+                                state.last_published_at.map(|t| t.to_string()).unwrap_or("None".to_string()),
+                                state.publish_duration_in_seconds.unwrap_or(0.0),
+                                );
+                        }
+                        _ => {
+                            warn!(
+                                "[{} gallery] too many crawled documents: `{}` documents crawled. Fail to parse saved state(It's wiered!)", 
+                                form.id,
+                                form.crawled_document_count, 
+                                );
+                        }
+                    }
+                }
+                _ => {
+                    warn!(
+                        "[{} gallery] too many crawled documents: `{}` documents crawled. No saved states(It's wiered!)", 
+                        form.id,
+                        form.crawled_document_count, 
+                        );
+                }
+            }
         }
         self.gallery_db
             .fetch_and_update(form.id.as_bytes(), |old| match old {
