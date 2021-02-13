@@ -18,7 +18,7 @@ use serde::Deserialize;
 use actix_web_prom::PrometheusMetrics;
 use prometheus::{labels, opts, Histogram, HistogramOpts, IntCounterVec, IntGauge};
 
-use log::{error, info};
+use log::{error, warn, info};
 
 #[derive(Error, Debug)]
 pub enum LiveDirectoryError {
@@ -140,6 +140,9 @@ impl State {
         self.metrics
             .crawled_document_count_histogram
             .observe(form.crawled_document_count as f64);
+        if form.crawled_document_count >= 500 {
+            warn!("too many crawled documents: `{}` documents crawled from `{}` gallery", form.crawled_document_count, form.id);
+        }
         self.gallery_db
             .fetch_and_update(form.id.as_bytes(), |old| match old {
                 Some(bytes) => {
@@ -148,12 +151,12 @@ impl State {
                         .map(|mut old_state| {
                             old_state.publish_duration_in_seconds =
                                 Some(
-                                    0.8 * old_state.publish_duration_in_seconds.unwrap_or(0.0) + 
+                                    0.9 * old_state.publish_duration_in_seconds.unwrap_or(0.0) + 
                                     match (form.last_crawled_at, old_state.last_published_at.or(old_state.last_crawled_at)) {
                                         (Some(n), Some(o)) => 
-                                            0.19 * ((n.signed_duration_since(o).num_seconds() as f64)
+                                            0.0999 * ((n.signed_duration_since(o).num_seconds() as f64)
                                                 / (form.crawled_document_count as f64)).min(3600.0) + 
-                                            0.01 * ((n.signed_duration_since(o).num_seconds() as f64)
+                                            0.0001 * ((n.signed_duration_since(o).num_seconds() as f64)
                                                 / (form.crawled_document_count as f64)).min(3600.0*24.0),
                                         (Some(n), _) => 0.0f64,
                                         _ => 0.0f64,
@@ -184,6 +187,11 @@ impl State {
                 form.worker_part.to_string().as_str(),
             ])
             .inc();
+        match form.error {
+            CrawlerErrorReport::Unknown => 
+                warn!("Unknown error reported from `{}` gallery at worker `{}`", form.id, form.worker_part),
+            _ => {}
+        };
         self.gallery_db
             .fetch_and_update(form.id.as_bytes(), |old| match old {
                 Some(bytes) => {
