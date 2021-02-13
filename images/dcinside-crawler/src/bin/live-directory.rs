@@ -155,6 +155,18 @@ impl State {
         info!("db upgrade done");
         Ok(())
     }
+    fn estimate_publish_duration(last_crawled_at: Option<chrono::DateTime<Utc>>, crawled_document_count: usize, state: &GalleryState) -> f64 {
+        return 0.9 * state.publish_duration_in_seconds.unwrap_or(0.0) + 
+        match (last_crawled_at, state.last_published_at.or(state.registered_at)) {
+            (Some(n), Some(o)) => 
+                0.0999 * ((n.signed_duration_since(o).num_seconds() as f64)
+                    / (crawled_document_count as f64)).min(3600.0) + 
+                0.0001 * ((n.signed_duration_since(o).num_seconds() as f64)
+                    / (crawled_document_count as f64)).min(3600.0*24.0),
+            (Some(n), _) => 0.0f64,
+            _ => 0.0f64,
+        }
+    }
     fn report(&self, form: GalleryCrawlReportForm) -> Result<(), LiveDirectoryError> {
         let mut found = false;
         self.metrics
@@ -204,18 +216,7 @@ impl State {
                     found = true;
                     serde_json::from_slice::<GalleryState>(bytes)
                         .map(|mut old_state| {
-                            old_state.publish_duration_in_seconds =
-                                Some(
-                                    0.9 * old_state.publish_duration_in_seconds.unwrap_or(0.0) + 
-                                    match (form.last_crawled_at, old_state.last_published_at.or(old_state.registered_at)) {
-                                        (Some(n), Some(o)) => 
-                                            0.0999 * ((n.signed_duration_since(o).num_seconds() as f64)
-                                                / (form.crawled_document_count as f64)).min(3600.0) + 
-                                            0.0001 * ((n.signed_duration_since(o).num_seconds() as f64)
-                                                / (form.crawled_document_count as f64)).min(3600.0*24.0),
-                                        (Some(n), _) => 0.0f64,
-                                        _ => 0.0f64,
-                                    });
+                            old_state.publish_duration_in_seconds = Some(State::estimate_publish_duration(form.last_crawled_at, form.crawled_document_count, &old_state));
                             if form.crawled_document_count > 0 {
                                 old_state.last_published_at = form.last_crawled_at;
                             }
@@ -255,6 +256,7 @@ impl State {
                         .map(|mut old_state| {
                             old_state.last_error = Some(form.error.clone());
                             old_state.last_crawled_at = form.last_crawled_at;
+                            old_state.publish_duration_in_seconds = Some(State::estimate_publish_duration(form.last_crawled_at, 0, &old_state));
                             old_state.visible = match form.error {
                                 CrawlerErrorReport::PageNotFound
                                 | CrawlerErrorReport::MinorGalleryClosed
