@@ -17,6 +17,11 @@ nodes="$(kubectl get node \
   -o=jsonpath="{range .items[?(@.metadata.creationTimestamp < '${min_node_creation_time}')]}{.metadata.name}{'\n'}{end}")"
 
 
+set +e
+echo "-. clean up things if previous run unexpectedly terminated.."
+kubectl delete pod -l="role=dummy" --wait=true
+set -e
+
 if [ -z "$nodes" ]; then
   echo "skip it.. no node candidiates.."
   exit 0
