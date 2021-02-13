@@ -243,7 +243,10 @@ impl State {
                                 None
                             }
                         }
-                        None => Some(v),
+                        None => {
+                            self.metrics.crawl_waittime_histogram.observe(0.0);
+                            Some(v)
+                        },
                     },
                     _ => None,
                 }
