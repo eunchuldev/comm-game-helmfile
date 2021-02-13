@@ -235,7 +235,7 @@ impl State {
                         err.to_string()
                     );
                     metric.gallery_error += 1;
-                    error!("report error");
+                    info!("report error");
                     if let Err(e) = self
                         .error_report(GalleryCrawlErrorReportForm {
                             worker_part: self.part,
