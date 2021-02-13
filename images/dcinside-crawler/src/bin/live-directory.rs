@@ -96,6 +96,7 @@ impl State {
                 visible: true,
                 last_error: None,
                 publish_duration_in_seconds: Some(0.0),
+                registered_at: Some(Utc::now()),
             };
             self.gallery_db.fetch_and_update(
                 new_state.index.id.clone().as_bytes(),
@@ -126,6 +127,32 @@ impl State {
         self.metrics
             .gallery_total
             .set(self.gallery_db.len().try_into().unwrap());
+        Ok(())
+    }
+    fn upgrade_db(gallery_db: sled::Tree) -> Result<(), LiveDirectoryError> {
+        let keys: Vec<_> = gallery_db
+            .iter()
+            .filter_map(|res| {
+                if res.is_err() {
+                    error!("fail to iterate over sled");
+                }
+                res.ok()
+            })
+            .map(|(k, _)| k)
+            .collect();
+        for k in keys {
+            gallery_db.fetch_and_update(k, |old| match old {
+                Some(bytes) => {
+                    Some(serde_json::from_slice::<GalleryState>(bytes)
+                        .map(|mut old_state| {
+                            old_state.registered_at = Some(old_state.registered_at.unwrap_or(Utc::now()));
+                            serde_json::to_vec(&old_state).unwrap()
+                        }).unwrap())
+                }
+                None => None,
+            })?;
+        }
+        info!("db upgrade done");
         Ok(())
     }
     fn report(&self, form: GalleryCrawlReportForm) -> Result<(), LiveDirectoryError> {
@@ -180,7 +207,7 @@ impl State {
                             old_state.publish_duration_in_seconds =
                                 Some(
                                     0.9 * old_state.publish_duration_in_seconds.unwrap_or(0.0) + 
-                                    match (form.last_crawled_at, old_state.last_published_at.or(old_state.last_crawled_at)) {
+                                    match (form.last_crawled_at, old_state.last_published_at.or(old_state.registered_at)) {
                                         (Some(n), Some(o)) => 
                                             0.0999 * ((n.signed_duration_since(o).num_seconds() as f64)
                                                 / (form.crawled_document_count as f64)).min(3600.0) + 
@@ -265,7 +292,7 @@ impl State {
                     error!("fail to parse value during iterate over sled");
                 }
                 match res {
-                    Ok(v) if v.visible => match v.last_published_at.or(v.last_crawled_at) {
+                    Ok(v) if v.visible => match v.last_published_at.or(v.registered_at) {
                         Some(t) => {
                             let duration_from_last_publish =
                                 now.signed_duration_since(t).num_seconds() as f64;
@@ -483,6 +510,7 @@ async fn main() -> std::io::Result<()> {
 
     let _metrics = metrics.clone();
     let db2 = db.clone();
+    State::upgrade_db(db2.clone()).unwrap();
     actix_rt::spawn(async move {
         loop {
             let state = State::with_db(db2.clone(), gallery_kind, _metrics.clone());

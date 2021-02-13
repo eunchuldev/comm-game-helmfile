@@ -480,6 +480,8 @@ pub struct GalleryState {
     pub publish_duration_in_seconds: Option<f64>,
     #[serde(default)]
     pub last_published_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub registered_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
