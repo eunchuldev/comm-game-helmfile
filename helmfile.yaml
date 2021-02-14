@@ -11,6 +11,8 @@ environments:
 repositories:
 - name: argo
   url: "https://argoproj.github.io/argo-helm"
+- name: grafana
+  url: "https://grafana.github.io/helm-charts"
 
 helmDefaults:
   wait: true
@@ -48,18 +50,20 @@ releases:
       replicas: 8
       distribute: false
       delay: 200
-      sleepDuration: 60000
+      sleepDuration: 120000
       nodeSelector: 
 {{ toYaml .Values.nodeSelectors.crawler | indent 8 }}
       resources:
         requests:
           memory: "60Mi"
-          cpu: "60m"
+          cpu: "100m"
     liveDirectory:
       image: {{ index .Values.images "dcinside-crawler" }}
       nodeSelector:
 {{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
       galleryKind: major
+      minWeightSeconds: "10800"
+      docsPerCrawl: "10"
       #resources:
       #  requests:
       #    memory: "100Mi"
@@ -105,10 +109,16 @@ releases:
   values:
   - image: {{ index .Values.images "crawler-node-rotator" }}
     nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+    targetNodeSelector:
 {{ toYaml .Values.nodeSelectors.crawler | indent 6 }}
     lifetimeMin: 120
     podLabel: "app.kubernetes.io/name=dc-crawler-worker"
     maxNodeCount: 8
+- name: argo-suppliment
+  chart: charts/argo-suppliment
+  values:
+  - serviceAccountName: argo-workflow
 - name: argo
   chart: argo/argo
   version: 0.15.2
@@ -127,6 +137,7 @@ releases:
   - server:
       nodeSelector: 
 {{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      serviceType: NodePort
   - controller:
       workflowDefaults:
         spec:
@@ -138,10 +149,36 @@ releases:
               defaultMode: 256
       nodeSelector: 
 {{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
-- name: argo-suppliment
-  chart: charts/argo-suppliment
+- name: grafana-suppliment
+  namespace: monitor
+  chart: charts/grafana-suppliment
   values:
-  - serviceAccountName: argo-workflow
+  -
+{{ toYaml .Values.grafana | indent 4 }}
+- name: loki-stack
+  chart: grafana/loki-stack
+  namespace: monitor
+  needs: [ monitor/grafana-suppliment ]
+  values:
+  - prometheus:
+      enabled: true
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+  - loki:
+      enabled: true
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+  - grafana:
+      enabled: true
+      admin:
+        existingSecret: "grafana-secret"
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      service:
+        type: NodePort
+        nodePort: 30010
+      #ingress:
+        #host: jupyter.dcgle.com
 - name: jupyter
   installed: true
   chart: charts/jupyter
@@ -154,16 +191,19 @@ releases:
         spark.kubernetes.executor.secrets.data-access=/run/data-access/
     nodeSelector: 
 {{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+    service:
+      type: NodePort
+      nodePort: 30000
+    #ingress:
+      #host: jupyter.dcgle.com
     spark:
       executor:
         image: {{ index .Values.images "spark" }}
         nodeSelector: 
 {{ toYaml .Values.nodeSelectors.etl | indent 10 }}
-    service:
-      type: NodePort
-      nodePort: 30001
-    #ingress:
-      #host: jupyter.dcgle.com
+      service: 
+        type: NodePort
+        nodePort: 30001
 - name: etl
   installed: true
   chart: charts/etl
