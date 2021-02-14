@@ -13,6 +13,10 @@ liveDirectory:
   galleryKind: major
   nodeSelector:
     cloud.google.com/gke-nodepool: default-pool
+  docsPerCrawl: "1"
+  minWeightSeconds: "10800"
+  pubDurEstimateWeight1: "0.0999"
+  pubDurEstimateWeight2: "0.0001"
   resources: {}
 dataBroker:
   bucket: 

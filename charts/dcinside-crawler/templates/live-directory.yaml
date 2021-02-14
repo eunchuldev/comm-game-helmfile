@@ -51,6 +51,14 @@ spec:
           value: "INFO"
         - name: GALLERY_KIND
           value: {{ .Values.liveDirectory.galleryKind }}
+        - name: DOCS_PER_CRAWL
+          value: {{ .Values.liveDirectory.docsPerCrawl }}
+        - name: MIN_WAIT_SECONDS
+          value: {{ .Values.liveDirectory.minWaitSeconds }}
+        - name: PUB_DUR_ESTIMATE_WEIGHT1
+          value: {{ .Values.liveDirectory.pubDurEstimateWeight1 }}
+        - name: PUB_DUR_ESTIMATE_WEIGHT2
+          value: {{ .Values.liveDirectory.pubDurEstimateWeight2 }}
         volumeMounts:
         - mountPath: /db
           name: db

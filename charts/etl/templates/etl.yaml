@@ -7,6 +7,8 @@ spec:
   schedule: "0 3 * * *"
   concurrencyPolicy: Allow
   startingDeadlineSeconds: 90000
+  podGC:
+    strategy: OnPodSuccess
   workflowSpec:
     entrypoint: etl
     templates:
@@ -30,31 +32,3 @@ spec:
                     value: {{`gs://comm-game/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
                   - name: referenceOrcPath
                     value: gs://comm-game/datalake/orc/dcinside/document/date=2021-01-16
-            - name: dcinside-parlai-dataset
-              templateRef:
-                name: parlai-dataset
-                template: dcinside
-              depends: dcinside-json-to-orc
-              arguments:
-                parameters:
-                  - name: inputPath
-                    value: {{`gs://comm-game/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
-                  - name: format
-                    value: orc
-                  - name: outputPath
-                    value: {{`gs://comm-game/datalake/parlai/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
-            - name: dcinside-parlai-dataset-skip-non-text
-              templateRef:
-                name: parlai-dataset
-                template: dcinside
-              depends: dcinside-json-to-orc
-              arguments:
-                parameters:
-                  - name: inputPath
-                    value: {{`gs://comm-game/datalake/orc/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}
-                  - name: format
-                    value: orc
-                  - name: skipNonText
-                    value: "True"
-                  - name: outputPath
-                    value: {{`gs://comm-game/datalake/parlai-skip-non-text/dcinside/document/date={{tasks.nominal-time.outputs.parameters.date}}/`}}

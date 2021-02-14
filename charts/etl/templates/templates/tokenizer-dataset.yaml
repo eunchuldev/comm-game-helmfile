@@ -1,0 +1,93 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: tokenizer-dataset
+spec:
+  templates:
+    - name: dcinside
+      inputs:
+        parameters:
+          - name: inputPath
+          - name: format
+            value: orc
+          - name: outputPath
+          - name: skipNonText
+            value: "false"
+      volumes:
+      - name: data-access-secrets
+        secret:
+          secretName: data-access
+          defaultMode: 256
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      {{- end }}
+      script:
+        volumeMounts:
+        - name: data-access-secrets
+          mountPath: /run/data-access
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /run/data-access/service-account.json
+        - name: SPARK_EXECUTOR_IMAGE
+          value: {{ index .Values.images "spark" }}
+        - name: SPARK_EXTRA_CONFIGS
+          value: |
+            spark.kubernetes.executor.secrets.data-access=/run/data-access
+            spark.kubernetes.driver.secrets.data-access=/run/data-access
+            spark.kubernetes.executor.request.cores=350m
+            {{- range $key, $val := .Values.nodeSelector }}
+            spark.kubernetes.node.selector.{{$key}}={{$val}}
+            {{- end }}
+        image: {{ index .Values.images "spark" }}
+        imagePullPolicy: IfNotPresent
+        command: [python]
+        source: |
+          input_path = "{{`{{inputs.parameters.inputPath}}`}}"
+          format = "{{`{{inputs.parameters.format}}`}}"
+          output_path = "{{`{{inputs.parameters.outputPath}}`}}"
+          skip_non_text = "{{`{{inputs.parameters.skipNonText}}`}}"
+
+          import datetime
+          from pyspark.sql import SparkSession, types as T, functions as F, Row
+          from pyspark.sql.window import Window
+          spark = (SparkSession.builder
+              .appName('tokenizer-dataset-dcinside')
+              .master('local')
+              .getOrCreate())
+          df = spark.read.format(format).load(input_path)
+          def dccon_parse(df, col):
+              return df.withColumn(col, F.when(
+                  F.col(col).startswith('<video'),
+                  F.concat(
+                      F.lit('<dccon '),
+                      F.regexp_extract(col, r'data-src="[^?]*\?no=([^"]+)"', 1),
+                      F.lit(' '),
+                      F.regexp_extract(col, r'title="([^"]*)"', 1),
+                      F.lit('>')),
+              ).when(
+                  F.col(col).startswith('<img'),
+                  F.concat(
+                      F.lit('<dccon '),
+                      F.regexp_extract(col, r'src="[^?]*\?no=([^"]+)"', 1),
+                      F.lit(' '),
+                      F.regexp_extract(col, r'title="([^"]*)"', 1),
+                      F.lit('>')),
+              ).otherwise(F.col(col)))
+          def filter_non_text(df, col):
+              return df.filter(~F.col(col).startswith('<'))
+
+          title_df = df.selectExpr('''CONCAT("<gallery ", gallery_id, "> ", title) AS text''')
+          comments_df = df.selectExpr('''EXPLODE(comments) as text''')
+          if skip_non_text.upper() == 'TRUE':
+              comments_df = filter_non_text(comments_df, 'text')
+              comments_df = comments_df.filter(~F.col('text').isNull())
+          else:
+              comments_df = dccon_parse(comments_df, 'text')
+          text_df = title_df.union(comments_df)
+
+          text_df.coalesce(1).write\
+            .mode('overwrite')\
+            .format('text')\
+            .option('compression', 'gzip')\
+            .save(output_path)

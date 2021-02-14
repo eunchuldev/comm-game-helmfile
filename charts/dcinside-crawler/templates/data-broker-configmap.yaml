@@ -14,6 +14,14 @@ data:
     address = "0.0.0.0:8080"
     encoding = "ndjson"
     type = "http"
+
+    [sources.internal_metrics]
+    type = "internal_metrics" 
+
+    [sinks.prometheus]
+    type = "prometheus_exporter"
+    inputs = [ "internal_metrics" ]
+    address = "0.0.0.0:9598"
 kind: "ConfigMap"
 metadata:
   name: dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}

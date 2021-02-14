@@ -26,6 +26,10 @@ spec:
     metadata:
       labels:
         app: jupyter
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '4040'
+        prometheus.io/path: '/metrics/executors/prometheus/'
     spec:
       serviceAccountName: jupyter
       containers:
@@ -49,6 +53,9 @@ spec:
         imagePullPolicy: "IfNotPresent"
         ports:
         - containerPort: 8888
+          name: jupyter
+        - containerPort: 4040
+          name: spark
         volumeMounts:
         - mountPath: "/run/data-access/"
           name: data-access
@@ -150,6 +157,12 @@ rules:
   - services
   verbs:
   - "*"
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - "*"
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -165,3 +178,20 @@ subjects:
   name: jupyter
 ---
 
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  labels:
+    app: jupyter-spark
+  name: jupyter-spark
+spec:
+  ports:
+  - port: 4040
+    name: spark
+    {{- if and (eq .Values.spark.service.type "NodePort") .Values.spark.service.nodePort }}
+    nodePort: {{ .Values.spark.service.nodePort }}
+    {{- end }}
+    targetPort: 4040
+  selector:
+    app: jupyter
+  type: {{ .Values.spark.service.type }}

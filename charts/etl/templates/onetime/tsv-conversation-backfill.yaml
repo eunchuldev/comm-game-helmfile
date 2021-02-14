@@ -1,0 +1,68 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: tsv-conversation-backfill
+spec:
+  entrypoint: main
+  # limit to one job at a time
+  parallelism: 2
+  templates:
+    - name: main
+      steps:
+        - - name: dcinside-parlai-dataset-skip-non-text-1
+            templateRef:
+              name: conversation-dataset
+              template: dcinside-tsv
+            arguments:
+              parameters:
+                - name: inputPath
+                  value: "gs://comm-game/datalake/orc/dcinside/document/date={{item}}/"
+                - name: format
+                  value: orc
+                - name: skipNonText
+                  value: "true"
+                - name: outputPath
+                  value: "gs://comm-game/datalake/nlp/conversation/dcinside/document/date={{item}}/"
+            withSequence:
+              # run for the 19th to the 21st
+              start: "22"
+              end: "22"
+              format: "2021-01-%02d"
+        - - name: dcinside-parlai-dataset-skip-non-text-2
+            templateRef:
+              name: conversation-dataset
+              template: dcinside-tsv
+            arguments:
+              parameters:
+                - name: inputPath
+                  value: "gs://comm-game/datalake/orc/dcinside/document/date={{item}}/"
+                - name: format
+                  value: orc
+                - name: skipNonText
+                  value: "true"
+                - name: outputPath
+                  value: "gs://comm-game/datalake/nlp/conversation/dcinside/document/date={{item}}/"
+            withSequence:
+              # run for the 19th to the 21st
+              start: "25"
+              end: "25"
+              format: "2021-01-%02d"
+        - - name: dcinside-parlai-dataset-skip-non-text-3
+            templateRef:
+              name: conversation-dataset
+              template: dcinside-tsv
+            arguments:
+              parameters:
+                - name: inputPath
+                  value: "gs://comm-game/datalake/orc/dcinside/document/date={{item}}/"
+                - name: format
+                  value: orc
+                - name: skipNonText
+                  value: "true"
+                - name: outputPath
+                  value: "gs://comm-game/datalake/nlp/conversation/dcinside/document/date={{item}}/"
+            withSequence:
+              # run for the 19th to the 21st
+              start: "1"
+              end: "6"
+              format: "2021-02-%02d"

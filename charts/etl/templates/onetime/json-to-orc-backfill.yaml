@@ -23,6 +23,6 @@ spec:
                   value: gs://comm-game/datalake/orc/dcinside/document/date=2021-01-16/
             withSequence:
               # run for the 19th to the 21st
-              start: "19"
-              end: "20"
-              format: "2021-01-%02d"
+              start: "10"
+              end: "10"
+              format: "2021-02-%02d"

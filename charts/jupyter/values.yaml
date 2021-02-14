@@ -1,5 +1,8 @@
 image:
 spark:
+  service:
+    type: NodePort
+    nodePort:
   executor:
     image:
     nodeSelector: {}

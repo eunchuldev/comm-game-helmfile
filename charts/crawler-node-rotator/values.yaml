@@ -1,6 +1,8 @@
 image: 
 nodeSelector:
   cloud.google.com/gke-nodepool: crawler-pool
+targetNodeSelector:
+  cloud.google.com/gke-nodepool: crawler-pool
 lifetimeMin: 60
 podLabel: app=dc-crawler-worker
 maxNodeCount: 1000
