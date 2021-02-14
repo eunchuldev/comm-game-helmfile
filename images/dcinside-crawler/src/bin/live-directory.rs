@@ -58,6 +58,10 @@ struct State {
     gallery_db: sled::Tree,
     gallery_kind: GalleryKind,
     metrics: Metrics,
+    target_docs_count_per_crawl: usize,
+    min_wait_seconds_per_gallery: usize,
+    publish_duration_estimate_weight1: f64,
+    publish_duration_estimate_weight2: f64,
 }
 
 impl State {
@@ -69,7 +73,27 @@ impl State {
             gallery_db: db,
             gallery_kind,
             metrics,
+            target_docs_count_per_crawl: 1,
+            min_wait_seconds_per_gallery: 3600*3,
+            publish_duration_estimate_weight1: 0.0999,
+            publish_duration_estimate_weight2: 0.0001,
         }
+    }
+    fn docs_per_crawl(mut self, v: usize) -> Self {
+        self.target_docs_count_per_crawl = v;
+        self
+    }
+    fn min_wait_seconds(mut self, v: usize) -> Self {
+        self.min_wait_seconds_per_gallery = v;
+        self
+    }
+    fn pub_dur_estimate_weight1(mut self, v: f64) -> Self {
+        self.publish_duration_estimate_weight1 = v;
+        self
+    }
+    fn pub_dur_estimate_weight2(mut self, v: f64) -> Self {
+        self.publish_duration_estimate_weight2 = v;
+        self
     }
     fn with_db(db: sled::Tree, gallery_kind: GalleryKind, metrics: Metrics) -> Self {
         State {
@@ -77,6 +101,11 @@ impl State {
             gallery_db: db,
             gallery_kind,
             metrics,
+            target_docs_count_per_crawl: 1,
+            min_wait_seconds_per_gallery: 3600*3,
+            publish_duration_estimate_weight1: 0.0999,
+            publish_duration_estimate_weight2: 0.0001,
+
         }
     }
     async fn update(&self) -> Result<(), LiveDirectoryError> {
@@ -155,13 +184,13 @@ impl State {
         info!("db upgrade done");
         Ok(())
     }
-    fn estimate_publish_duration(last_crawled_at: Option<chrono::DateTime<Utc>>, crawled_document_count: usize, state: &GalleryState) -> f64 {
-        return 0.9 * state.publish_duration_in_seconds.unwrap_or(0.0) + 
+    fn estimate_publish_duration(&self, last_crawled_at: Option<chrono::DateTime<Utc>>, crawled_document_count: usize, state: &GalleryState) -> f64 {
+        return (1.0 - self.publish_duration_estimate_weight1 - self.publish_duration_estimate_weight2) * state.publish_duration_in_seconds.unwrap_or(0.0) + 
         match (last_crawled_at, state.last_published_at.or(state.registered_at)) {
             (Some(n), Some(o)) => 
-                0.0999 * ((n.signed_duration_since(o).num_seconds() as f64)
+                self.publish_duration_estimate_weight1 * ((n.signed_duration_since(o).num_seconds() as f64)
                     / (crawled_document_count as f64)).min(3600.0) + 
-                0.0001 * ((n.signed_duration_since(o).num_seconds() as f64)
+                self.publish_duration_estimate_weight2 * ((n.signed_duration_since(o).num_seconds() as f64)
                     / (crawled_document_count as f64)).min(3600.0*24.0),
             (Some(n), _) => 0.0f64,
             _ => 0.0f64,
@@ -216,7 +245,7 @@ impl State {
                     found = true;
                     serde_json::from_slice::<GalleryState>(bytes)
                         .map(|mut old_state| {
-                            old_state.publish_duration_in_seconds = Some(State::estimate_publish_duration(form.last_crawled_at, form.crawled_document_count, &old_state));
+                            old_state.publish_duration_in_seconds = Some(self.estimate_publish_duration(form.last_crawled_at, form.crawled_document_count, &old_state));
                             if form.crawled_document_count > 0 {
                                 old_state.last_published_at = form.last_crawled_at;
                             }
@@ -256,7 +285,7 @@ impl State {
                         .map(|mut old_state| {
                             old_state.last_error = Some(form.error.clone());
                             old_state.last_crawled_at = form.last_crawled_at;
-                            old_state.publish_duration_in_seconds = Some(State::estimate_publish_duration(form.last_crawled_at, 0, &old_state));
+                            old_state.publish_duration_in_seconds = Some(self.estimate_publish_duration(form.last_crawled_at, 0, &old_state));
                             old_state.visible = match form.error {
                                 CrawlerErrorReport::PageNotFound
                                 | CrawlerErrorReport::MinorGalleryClosed
@@ -298,8 +327,8 @@ impl State {
                         Some(t) => {
                             let duration_from_last_publish =
                                 now.signed_duration_since(t).num_seconds() as f64;
-                            let wait_time = (v.publish_duration_in_seconds.unwrap_or(0.0) * 1.0)
-                                .min(3600.0 * 24.0);
+                            let wait_time = (v.publish_duration_in_seconds.unwrap_or(0.0) * self.target_docs_count_per_crawl as f64)
+                                .min(self.min_wait_seconds_per_gallery as f64);
                             self.metrics.crawl_waittime_histogram.observe(wait_time);
                             if duration_from_last_publish >= wait_time {
                                 Some(v)
@@ -434,17 +463,36 @@ async fn main() -> std::io::Result<()> {
     let gallery_kind: GalleryKind = std::env::var("GALLERY_KIND")
         .unwrap_or("major".to_string())
         .into();
+    let docs_per_crawl: usize = std::env::var("DOCS_PER_CRAWL")
+        .unwrap_or("10".to_string())
+        .parse()
+        .unwrap();
+    let min_wait_seconds: usize = std::env::var("MIN_WAIT_SECONDS")
+        .unwrap_or("10800".to_string())
+        .parse()
+        .unwrap();
+    let pub_dur_estimate_weight1: f64 = std::env::var("PUB_DUR_ESTIMATE_WEIGHT1")
+        .unwrap_or("0.0999".to_string())
+        .parse()
+        .unwrap();
+    let pub_dur_estimate_weight2: f64 = std::env::var("PUB_DUR_ESTIMATE_WEIGHT2")
+        .unwrap_or("0.0001".to_string())
+        .parse()
+        .unwrap();
+
+
+
 
     let prometheus = PrometheusMetrics::new(
         "dccrawler",
         Some("/metrics"),
-        Some(labels! { "gallery_kind".to_string() => <(&str)>::from(gallery_kind).to_string() }),
+        Some(labels! { "gallery_kind".to_string() => <&str>::from(gallery_kind).to_string() }),
     );
     let metrics = Metrics {
         gallery_total: IntGauge::with_opts(opts!(
             "dccrawler_gallery_total",
             "dccrawler_gallery_total",
-            labels! { "gallery_kind" => <(&str)>::from(gallery_kind) }
+            labels! { "gallery_kind" => <&str>::from(gallery_kind) }
         ))
         .unwrap(),
         worker_report_success_total: IntCounterVec::new(
@@ -468,7 +516,7 @@ async fn main() -> std::io::Result<()> {
                 "dccrawler_crawl_waittime_histogram",
                 "dccrawler_crawl_waittime_histogram",
             )
-            .const_label("gallery_kind", <(&str)>::from(gallery_kind))
+            .const_label("gallery_kind", <&str>::from(gallery_kind))
             .buckets(vec![
                 60.0,
                 300.0,
@@ -484,7 +532,7 @@ async fn main() -> std::io::Result<()> {
                 "dccrawler_crawled_document_count_histogram",
                 "dccrawler_crawled_document_count_histogram",
             )
-            .const_label("gallery_kind", <(&str)>::from(gallery_kind))
+            .const_label("gallery_kind", <&str>::from(gallery_kind))
             .buckets(vec![0.0, 5.0, 10.0, 30.0, 100.0, 500.0, 1000.0, 10000.0]),
         )
         .unwrap(),
@@ -515,7 +563,11 @@ async fn main() -> std::io::Result<()> {
     State::upgrade_db(db2.clone()).unwrap();
     actix_rt::spawn(async move {
         loop {
-            let state = State::with_db(db2.clone(), gallery_kind, _metrics.clone());
+            let state = State::with_db(db2.clone(), gallery_kind, _metrics.clone())
+                .docs_per_crawl(docs_per_crawl)
+                .min_wait_seconds(min_wait_seconds)
+                .pub_dur_estimate_weight1(pub_dur_estimate_weight1)
+                .pub_dur_estimate_weight2(pub_dur_estimate_weight2);
             let res = update_forever(state, Duration::from_secs(60)).await;
             if let Err(e) = res {
                 error!("updator restart due to: {}", e.to_string());
@@ -523,7 +575,11 @@ async fn main() -> std::io::Result<()> {
         }
     });
     HttpServer::new(move || {
-        let state = State::with_db(db.clone(), gallery_kind, metrics.clone());
+        let state = State::with_db(db.clone(), gallery_kind, metrics.clone())
+            .docs_per_crawl(docs_per_crawl)
+            .min_wait_seconds(min_wait_seconds)
+            .pub_dur_estimate_weight1(pub_dur_estimate_weight1)
+            .pub_dur_estimate_weight2(pub_dur_estimate_weight2);
         App::new()
             .wrap(prometheus.clone())
             .app_data(web::Data::new(state))
@@ -538,7 +594,7 @@ async fn main() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{body::Body, http, test, web, App};
+    use actix_web::{http, test, App};
 
     #[actix_rt::test]
     async fn state_update_minor_list_part() {
