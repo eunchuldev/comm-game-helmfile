@@ -16,7 +16,7 @@ repositories:
 
 helmDefaults:
   wait: true
-  timeout: 300
+  timeout: 60
   atomic: true
   cleanupOnFail: false
   kubeContext: {{ requiredEnv "KUBE_CONTEXT" }}
@@ -62,7 +62,7 @@ releases:
       nodeSelector:
 {{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
       galleryKind: major
-      minWeightSeconds: "10800"
+      minWaitSeconds: "10800"
       docsPerCrawl: "10"
       #resources:
       #  requests:
@@ -149,6 +149,16 @@ releases:
               defaultMode: 256
       nodeSelector: 
 {{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+- name: dcinside-document-search-server
+  chart: charts/bayard
+  values:
+  - nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+- name: toshi
+  chart: charts/toshi
+  values:
+  - nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
 - name: grafana-suppliment
   namespace: monitor
   chart: charts/grafana-suppliment

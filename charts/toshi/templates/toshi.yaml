@@ -1,0 +1,83 @@
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  labels:
+    app: toshi
+  name: toshi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: toshi
+  template:
+    metadata:
+      labels:
+        app: toshi
+      annotations:
+        configHash: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+        schemaHash: {{ include (print $.Template.BasePath "/schema.yaml") . | sha256sum }}
+    spec:
+      initContainers:
+      - name: init-schema
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        volumeMounts:
+          - mountPath: "/config"
+            name: config
+          - mountPath: "/schema"
+            name: schema
+          - mountPath: "/data"
+            name: data
+        command: ['sh', '-c']
+        args: -|
+          toshi &
+          sleep 3
+          for f in /schema/*; do
+            curl -X PUT \
+             --header 'Content-Type: application/json' \
+             --data-binary @"$f" \
+             "http://localhost:8080/$(basename $f)/_create"
+          done
+      containers:
+      - name: "toshi"
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: "IfNotPresent"
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+          - mountPath: "/config"
+            name: config
+          - mountPath: "/data"
+            name: data
+        {{- if .Values.resources }}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+        {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: toshi-config
+        - name: schema
+          configMap:
+            name: toshi-schema
+        - name: data
+          emptyDir: {}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      {{- end }}
+
+---
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  labels:
+    app: toshi
+  name: toshi
+spec:
+  ports:
+    - port: 8080
+  selector:
+    app: toshi
+  type: "ClusterIP"

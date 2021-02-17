@@ -1,0 +1,101 @@
+apiVersion: "v1"
+kind: "ConfigMap"
+metadata:
+  name: toshi-schemas
+data:
+  document: |
+    [
+      {
+        "name": "_id",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "basic",
+            "tokenizer": "raw"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "author.ip",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "basic",
+            "tokenizer": "raw"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "author.id",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "basic",
+            "tokenizer": "raw"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "author.nickname",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "basic",
+            "tokenizer": "raw"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "position",
+            "tokenizer": "default"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "comment_count",
+        "type": "u64",
+        "options": {
+          "indexed": true,
+          "fast": "single",
+          "stored": true
+        }
+      },
+      {
+        "name": "like_count",
+        "type": "u64",
+        "options": {
+          "indexed": true,
+          "fast": "single",
+          "stored": true
+        }
+      },
+      {
+        "name": "gallery_id",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "basic",
+            "tokenizer": "raw"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "created_at",
+        "type": "date",
+        "options": {
+          "indexed": true,
+          "fast": "single",
+          "stored": true
+        }
+      }
+    ]

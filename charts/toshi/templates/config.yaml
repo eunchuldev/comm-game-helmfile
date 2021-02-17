@@ -1,0 +1,32 @@
+apiVersion: "v1"
+data:
+  config.toml: |
+    host = "0.0.0.0"
+    port = 8080
+    path = "/data/"
+    writer_memory = 200000000
+    log_level = "info"
+    json_parsing_threads = 1
+    bulk_buffer_size = 10000
+    auto_commit_duration = 10
+    experimental = false
+
+    [experimental_features]
+    master = true
+    nodes = [
+        "toshi-0:8081"
+    ]
+
+    [merge_policy]
+    kind = "log"
+    min_merge_size = 8
+    min_layer_size = 10_000
+    level_log_size = 0.75
+  logging.toml: |
+    type = "terminal"
+    level = "info"
+    timezone = "utc"
+    format = "full"
+kind: "ConfigMap"
+metadata:
+  name: toshi-config
