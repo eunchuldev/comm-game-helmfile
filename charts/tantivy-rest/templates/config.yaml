@@ -1,0 +1,166 @@
+kind: "ConfigMap"
+metadata:
+  name: {{ .Release.Name }} 
+apiVersion: "v1"
+data:
+  schema.json: |
+    [
+      {
+        "name": "_id",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "basic",
+            "tokenizer": "raw"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "author.ip",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "basic",
+            "tokenizer": "raw"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "author.id",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "basic",
+            "tokenizer": "raw"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "author.nickname",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "basic",
+            "tokenizer": "raw"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "title",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "position",
+            "tokenizer": "default"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "comment_count",
+        "type": "u64",
+        "options": {
+          "indexed": true,
+          "fast": "single",
+          "stored": true
+        }
+      },
+      {
+        "name": "like_count",
+        "type": "u64",
+        "options": {
+          "indexed": true,
+          "fast": "single",
+          "stored": true
+        }
+      },
+      {
+        "name": "gallery_id",
+        "type": "text",
+        "options": {
+          "indexing": {
+            "record": "basic",
+            "tokenizer": "raw"
+          },
+          "stored": true
+        }
+      },
+      {
+        "name": "created_at",
+        "type": "date",
+        "options": {
+          "indexed": true,
+          "fast": "single",
+          "stored": true
+        }
+      }
+    ]
+  tokenizer.json: |
+    {
+      "raw": {
+        "tokenizer": {
+          "name": "raw"
+        }
+      },
+      "unigram": {
+        "tokenizer": {
+          "name": "ngram",
+          "args": {
+            "min_gram": 1,
+            "max_gram": 1,
+            "prefix_only": false
+          }
+        },
+        "filters": [
+          { "name": "ascii_folding" },
+          { "name": "lower_case" }
+        ]
+      },
+      "bigram": {
+        "tokenizer": {
+          "name": "ngram",
+          "args": {
+            "min_gram": 1,
+            "max_gram": 2,
+            "prefix_only": false
+          }
+        },
+        "filters": [
+          { "name": "ascii_folding" },
+          { "name": "lower_case" }
+        ]
+      },
+      "trigram": {
+        "tokenizer": {
+          "name": "ngram",
+          "args": {
+            "min_gram": 1,
+            "max_gram": 3,
+            "prefix_only": false
+          }
+        },
+        "filters": [
+          { "name": "ascii_folding" },
+          { "name": "lower_case" }
+        ]
+      },
+      "default": {
+        "tokenizer": {
+          "name": "simple"
+        },
+        "filters": [
+          {
+            "name": "remove_long",
+            "args": {
+              "length_limit": 80
+            }
+          },
+          { "name": "ascii_folding" },
+          { "name": "lower_case" }
+        ]
+      }
+    }
