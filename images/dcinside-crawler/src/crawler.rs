@@ -134,7 +134,6 @@ impl<'a> Crawler {
             let text = std::str::from_utf8(&bytes)?;
             let trimed = text.trim();
             let jsonp_contents = &trimed[jsonp_callback_func.len() + 1..trimed.len() - 1];
-            print!("{}", &jsonp_contents);
             let mut galleries: Vec<GalleryIndex> = serde_json::from_str(&jsonp_contents)?;
             for g in galleries.iter_mut() {
                 g.kind = GalleryKind::Major;
