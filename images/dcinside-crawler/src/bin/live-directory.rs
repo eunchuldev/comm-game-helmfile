@@ -661,6 +661,7 @@ mod tests {
         for t in res2.iter() {
             h.insert(t.index.id.clone());
         }
+        assert!(h.len() > 70);
         assert_eq!(h.len(), res1.len() + res2.len());
         assert_eq!(
             state.metrics.gallery_total.get() as usize,
