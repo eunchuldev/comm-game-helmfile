@@ -13,6 +13,8 @@ repositories:
   url: "https://argoproj.github.io/argo-helm"
 - name: grafana
   url: "https://grafana.github.io/helm-charts"
+- name: elastic 
+  url: https://helm.elastic.co
 
 helmDefaults:
   wait: true
@@ -149,15 +151,31 @@ releases:
               defaultMode: 256
       nodeSelector: 
 {{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
-- name: dcinside-document-search-server
-  chart: charts/bayard
+- name: tantivy-rest-dcinside-docs
+  chart: charts/tantivy-rest
+  installed: true
+  values:
+  - image: 
+      repository: {{ (split ":" (index .Values.images "tantivy-rest"))._0 }}
+      tag: {{ (split ":" (index .Values.images "tantivy-rest"))._1 }}
+  - nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+  - schema: |
+{{ readFile "tantivy-schema/dcinside-document.yaml" | indent 6 }}
+- name: toshi
+  chart: charts/toshi
+  installed: false 
   values:
   - nodeSelector: 
 {{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
-- name: toshi
-  chart: charts/toshi
+  - image:
+      repository: gcr.io/comm-game/toshi
+      tag: 6981c71
+- name: elasticsearch
+  chart: elastic/elasticsearch
+  installed: false
   values:
-  - nodeSelector: 
+  - nodeSelector:
 {{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
 - name: grafana-suppliment
   namespace: monitor
@@ -172,6 +190,9 @@ releases:
   values:
   - prometheus:
       enabled: true
+      server:
+        global:
+          scrape_interval: 1m
       nodeSelector:
 {{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
   - loki:

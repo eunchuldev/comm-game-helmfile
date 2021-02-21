@@ -4,3 +4,4 @@ replicas: 1
 image:
   repository: gcr.io/comm-game/tantivy-rest
   tag: 6981c71
+schema: 
