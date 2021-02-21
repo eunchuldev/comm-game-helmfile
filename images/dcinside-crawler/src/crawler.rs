@@ -111,6 +111,37 @@ impl<'a> Crawler {
         self.delay = Duration::from_millis(millis);
         self
     }
+    pub async fn weekly_hot_galleries(&self) -> Result<Vec<GalleryIndex>, CrawlerError> {
+        let jsonp_callback_func = format!(
+            "jQuery32109002533932178827_{}",
+            Utc::now().timestamp_millis()
+        );
+        let path = format!(
+            "https://json2.dcinside.com/json0/gallmain/gallery_hot.php?jsoncallback={}&_={}",
+            jsonp_callback_func,
+            Utc::now().timestamp_millis()
+        );
+        Ok(back_off!(1000, 1000 * 10, || async {
+            let bytes = self
+                .client
+                .get(path.as_str())
+                .header("Referer", "https://gall.dcinside.com/")
+                .send()
+                .await?
+                .body()
+                .limit(1024 * 1024 * 8)
+                .await?;
+            let text = std::str::from_utf8(&bytes)?;
+            let trimed = text.trim();
+            let jsonp_contents = &trimed[jsonp_callback_func.len() + 1..trimed.len() - 1];
+            print!("{}", &jsonp_contents);
+            let mut galleries: Vec<GalleryIndex> = serde_json::from_str(&jsonp_contents)?;
+            for g in galleries.iter_mut() {
+                g.kind = GalleryKind::Major;
+            }
+            Ok::<_, CrawlerError>(galleries)
+        })?)
+    }
     pub async fn realtime_hot_galleries(&self) -> Result<Vec<GalleryIndex>, CrawlerError> {
         let jsonp_callback_func = format!(
             "jQuery3210837750950307798_{}",
@@ -481,6 +512,15 @@ impl Default for Crawler {
 mod tests {
     use super::*;
     #[actix_rt::test]
+    async fn weekly_hot_galleries() {
+        let crawler = Crawler::new();
+        let res = crawler.weekly_hot_galleries().await.unwrap();
+        assert!(!res.is_empty());
+        assert!(!res[0].id.is_empty());
+        assert!(!res[0].name.is_empty());
+        assert_eq!(res[0].kind, GalleryKind::Major);
+    }
+    #[actix_rt::test]
     async fn realtime_hot_galleries() {
         let crawler = Crawler::new();
         let res = crawler.realtime_hot_galleries().await.unwrap();
@@ -574,6 +614,7 @@ mod tests {
             false
         }));*/
     }
+    /*
     #[actix_rt::test]
     async fn minor_comments() {
         let mut crawler = Crawler::new();
@@ -598,6 +639,7 @@ mod tests {
             false
         }));*/
     }
+    */
     /*
     #[actix_rt::test]
     async fn documents() {

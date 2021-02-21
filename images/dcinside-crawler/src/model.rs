@@ -1,7 +1,9 @@
 use crate::error::*;
 
+use std::{fmt::Display, str::FromStr};
+
 use chrono::{DateTime, Datelike, Duration, NaiveDateTime, TimeZone, Utc};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 
 use select::document::Document as HTMLDocument;
 use select::predicate::{Class, Name, Predicate};
@@ -117,6 +119,23 @@ pub enum User {
     },
 }
 
+
+pub fn deserialize_string_or_int<'de, D>(deserializer: D) -> Result<String, D::Error>
+    where D: Deserializer<'de>
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrInt {
+        String(String),
+        Int(i64),
+    }
+
+    match StringOrInt::deserialize(deserializer)? {
+        StringOrInt::String(s) => Ok(s),
+        StringOrInt::Int(i) => Ok(i.to_string()),
+    }
+}
+
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Clone)]
 pub struct GalleryIndex {
     pub id: String,
@@ -124,7 +143,8 @@ pub struct GalleryIndex {
     pub name: String,
     #[serde(default)]
     pub kind: GalleryKind,
-    pub rank: Option<String>,
+    #[serde(default, deserialize_with = "serde_aux::field_attributes::deserialize_option_number_from_string")]
+    pub rank: Option<usize>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Clone)]

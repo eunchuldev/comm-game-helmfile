@@ -153,6 +153,35 @@ impl State {
                 },
             )?;
         }
+        let weekly_hot_galleries = match self.gallery_kind {
+            GalleryKind::Major => self.crawler.weekly_hot_galleries().await?,
+            GalleryKind::Minor => Vec::new(),
+            GalleryKind::Mini => panic!("mini gallery kind not supported yet"),
+        };
+        for index in weekly_hot_galleries {
+            self.gallery_db.fetch_and_update(
+                index.id.clone().as_bytes(),
+                move |old| {
+                    Some(match old {
+                        Some(bytes) => bytes.to_vec(),
+                        None => {
+                            let new_state = GalleryState {
+                                index: index.clone(),
+                                last_ranked: now.clone(),
+                                last_crawled_at: None,
+                                last_published_at: None,
+                                last_crawled_document_id: None,
+                                visible: true,
+                                last_error: None,
+                                publish_duration_in_seconds: Some(0.0),
+                                registered_at: Some(Utc::now()),
+                            };
+                            serde_json::to_vec(&new_state).unwrap()
+                        }
+                    })
+                },
+            )?;
+        }
         self.metrics
             .gallery_total
             .set(self.gallery_db.len().try_into().unwrap());
