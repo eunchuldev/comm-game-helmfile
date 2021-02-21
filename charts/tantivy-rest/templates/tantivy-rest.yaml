@@ -39,7 +39,7 @@ spec:
           - name: INDEX_DIR
             value: "/etc/tantivy-rest/data"
           - name: SCHEMA_FILE
-            value: "/etc/tantivy-rest/config/schema.json"
+            value: "/etc/tantivy-rest/schema.json"
           - name: INDEX_WRITER_MEMORY_IN_BYTES
             value: "200000000"
           - name: INDEX_WRITER_THREADS
