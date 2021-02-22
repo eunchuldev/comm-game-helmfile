@@ -50,15 +50,15 @@ spec:
         - name: RUST_LOG
           value: "INFO"
         - name: GALLERY_KIND
-          value: {{ .Values.liveDirectory.galleryKind }}
+          value: {{ .Values.liveDirectory.galleryKind | quote }}
         - name: DOCS_PER_CRAWL
-          value: {{ .Values.liveDirectory.docsPerCrawl }}
+          value: {{ .Values.liveDirectory.docsPerCrawl | quote }}
         - name: MIN_WAIT_SECONDS
-          value: {{ .Values.liveDirectory.minWaitSeconds }}
+          value: {{ .Values.liveDirectory.minWaitSeconds | quote }}
         - name: PUB_DUR_ESTIMATE_WEIGHT1
-          value: {{ .Values.liveDirectory.pubDurEstimateWeight1 }}
+          value: {{ .Values.liveDirectory.pubDurEstimateWeight1 | quote }}
         - name: PUB_DUR_ESTIMATE_WEIGHT2
-          value: {{ .Values.liveDirectory.pubDurEstimateWeight2 }}
+          value: {{ .Values.liveDirectory.pubDurEstimateWeight2 | quote }}
         volumeMounts:
         - mountPath: /db
           name: db
