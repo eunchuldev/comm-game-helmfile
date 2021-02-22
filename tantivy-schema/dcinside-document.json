@@ -48,8 +48,8 @@
     "type": "text",
     "options": {
       "indexing": {
-        "record": "position",
-        "tokenizer": "default"
+        "record": "basic",
+        "tokenizer": "koNgram"
       },
       "stored": true
     }

@@ -1,0 +1,19 @@
+{
+  "koNgram": {
+    "tokenizer": {
+      "ngram": {
+        "minGram": 1,
+        "maxGram": 10,
+        "prefixOnly": false
+      }
+    },
+    "filters": [
+      {
+        "regex":  {
+          "re": "[^A-Za-z0-9ㄱ-ㅎㅏ-ㅣ가-힣~!?.,():;*/=+\-\[\]\s\n<>]",
+          "replacer": ""
+        }
+      }
+    ]
+  }
+}
