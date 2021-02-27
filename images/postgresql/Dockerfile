@@ -11,7 +11,7 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
   make USE_PGXS=1 install && \
   cd .. && \
   rm -rf rum && \
-  git clone https://github.com/akorotkov/vgram && \
+  git clone https://github.com/sech9446/vgram && \
   cd vgram && \
   make USE_PGXS=1 install && \
   cd .. && \
