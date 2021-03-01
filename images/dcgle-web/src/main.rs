@@ -23,6 +23,7 @@ struct Opts {
 async fn main() -> Result<()> {
     pretty_env_logger::init();
     let opts: Opts = Opts::parse();
+    model::State::migrate(&opts.db_url).await?;
     let s1 = web::serve(
         &opts.host,
         opts.port,

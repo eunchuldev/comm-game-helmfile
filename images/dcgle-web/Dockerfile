@@ -23,4 +23,8 @@ COPY --from=builder \
     /home/rust/src/svelte-app/public \
     svelte-app/public
 
+COPY --from=builder \
+    /home/rust/src/migrations \
+    migrations
+
 ENTRYPOINT server

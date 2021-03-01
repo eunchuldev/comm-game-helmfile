@@ -2,15 +2,13 @@ use crate::error::{Result, Error};
 use crate::model::State;
 use serde::{Deserialize};
 use actix_web::{
-    error::ErrorInternalServerError, get, post, web, App, HttpResponse, HttpServer, Responder,
+    get, post, web, App, HttpResponse, HttpServer,
     web::ServiceConfig,
 };
-use actix_files::{Files, NamedFile};
-use futures::TryStreamExt;
-use log::{debug, error};
+use actix_files::Files;
+use log::{info};
 use prometheus::{Encoder, TextEncoder};
-use std::time::Duration;
-use std::thread;
+
 
 type DateTime = chrono::DateTime<chrono::Utc>;
 
@@ -59,7 +57,7 @@ pub async fn serve(
     db_url: &str,
 ) -> Result<()> {
     let state = State::connect(db_url).await?;
-    println!("start web service at {}:{}", host, port);
+    info!("start web service at {}:{}", host, port);
     Ok(HttpServer::new(move || App::new().configure(config_app(state.clone())))
         .bind(format!("{}:{}", host, port).as_str())?
         .run()

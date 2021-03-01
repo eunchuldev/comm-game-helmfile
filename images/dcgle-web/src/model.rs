@@ -1,5 +1,5 @@
-use crate::error::{Result, Error};
-use log::{debug, error};
+use crate::error::Result;
+use log::{debug, info};
 use serde::{Serialize, Deserialize};
 use lazy_static::lazy_static;
 use prometheus::{
@@ -70,6 +70,7 @@ impl State {
         let mut migrator = sqlx::migrate!();
         migrator.migrations.to_mut().retain(|migration| !migration.description.ends_with(".down"));
         migrator.run(&pool).await?;
+        info!("db migration done");
         Ok(())
     }
     pub async fn connect(db_url: &str) -> Result<Self> {
@@ -105,7 +106,7 @@ impl State {
         let res = sqlx::query_as::<_, Document>("SELECT * FROM users WHERE _title @@ ? ORDER BY _gallery_id_and_created_at <=| cat_and_time(?, ?) LIMIT 100")
             .bind(title)
             .bind(gallery)
-            .bind(chrono::Utc::now())
+            .bind(last_created_at.unwrap_or(chrono::Utc::now()))
             .fetch_all(&self.pool)
             .await?;
         timer.observe_duration();

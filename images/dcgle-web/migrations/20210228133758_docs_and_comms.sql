@@ -1,7 +1,7 @@
 -- Add migration script here
 
 CREATE FUNCTION vgram(text text, min integer default 2, max integer default 20) RETURNS tsvector AS $BODY$ BEGIN
-  RETURN array_to_tsvector((select array_agg(substring(lexeme, l1, l2)) from unnest(to_tsvector('^' || REGEXP_REPLACE(text, '[^A-Za-z가-힣ㅏ-ㅣㄱ-ㅎ0-9*;(),.@~]', '') || '$')), generate_series(1, length(lexeme)) l1, generate_series(greatest(1, min), least(length(lexeme)-l1+1, max)) l2));
+  RETURN array_to_tsvector((select array_agg(substring(lexeme, l1, l2)) from unnest(string_to_array(REGEXP_REPLACE(text, '[^A-Za-z가-힣ㅏ-ㅣㄱ-ㅎ0-9*;(),.@~#\s]', ''), ' ')) lexeme, generate_series(1, length(lexeme)) l1, generate_series(greatest(1, min), least(length(lexeme)-l1+1, max)) l2));
 END; $BODY$ IMMUTABLE language plpgsql;
 
 CREATE FUNCTION cat_and_time(cat text, t timestamp with time zone) RETURNS bigint AS $BODY$ BEGIN
