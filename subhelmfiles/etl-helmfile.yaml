@@ -1,0 +1,205 @@
+environments:
+  prod:
+    secrets:
+    - "../envs/{{ .Environment.Name }}/secrets.yaml"
+    values:
+    - "../envs/values.yaml"
+    - "../envs/{{ .Environment.Name }}/values.yaml.gotmpl"
+    - "../envs/{{ .Environment.Name }}/images.yaml"
+    - "../envs/{{ .Environment.Name }}/node-selectors.yaml"
+
+repositories:
+- name: argo
+  url: "https://argoproj.github.io/argo-helm"
+
+releases:
+- name: data-access-secrets
+  chart: ../charts/data-access-secrets
+  values:
+  - secrets: 
+{{ toYaml .Values.dataAccessSecrets | indent 6 }}
+- name: dcinside-crawler-major
+  installed: true
+  chart: ../charts/dcinside-crawler
+  values:
+  - dataBroker:
+      image: {{ index .Values.images "vector" }}
+      bucket: comm-game
+      prefix: datalake/json/dcinside/document/
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      resources:
+        requests:
+          memory: "50Mi"
+          cpu: "50m"
+      extraConfigs: |
+        [sinks.dc_doc_search_server]
+        type = "http"
+        inputs = [ "dc_doc" ]
+        uri = "http://tantivy-rest-dcinside-docs-0.tantivy-rest-dcinside-docs:8000/docs"
+
+        encoding.codec = "ndjson"
+        encoding.except_fields = ["comments"]
+
+        healthcheck.enabled = true 
+        healthcheck.uri = "http://tantivy-rest-dcinside-docs-0.tantivy-rest-dcinside-docs:8000/healthz"
+    worker:
+      labels: 
+        app.kubernetes.io/name: dc-crawler-worker
+      image: {{ index .Values.images "dcinside-crawler" }}
+      replicas: 8
+      distribute: false
+      delay: 500
+      sleepDuration: 120000
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.crawler | indent 8 }}
+      resources:
+        requests:
+          memory: "60Mi"
+          cpu: "100m"
+    liveDirectory:
+      image: {{ index .Values.images "dcinside-crawler" }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      galleryKind: major
+      minWaitSeconds: "10800"
+      docsPerCrawl: "10"
+      resources:
+        requests:
+          memory: "150Mi"
+          cpu: "20m"
+- name: dcinside-crawler-minor
+  installed: true
+  chart: ../charts/dcinside-crawler
+  values:
+  - dataBroker:
+      bucket: comm-game
+      image: {{ index .Values.images "vector" }}
+      prefix: datalake/json/dcinside/document/
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      resources:
+        requests:
+          memory: "50Mi"
+          cpu: "50m"
+      extraConfigs: |
+        [sinks.dc_doc_search_server]
+        type = "http"
+        inputs = [ "dc_doc" ]
+        uri = "http://tantivy-rest-dcinside-docs-0.tantivy-rest-dcinside-docs:8000/docs"
+
+        encoding.codec = "ndjson"
+        encoding.except_fields = ["comments"]
+
+        healthcheck.enabled = true 
+        healthcheck.uri = "http://tantivy-rest-dcinside-docs-0.tantivy-rest-dcinside-docs:8000/healthz"
+    worker:
+      labels: 
+        app.kubernetes.io/name: dc-crawler-worker
+      image: {{ index .Values.images "dcinside-crawler" }}
+      replicas: 8
+      distribute: false
+      delay: 500
+      sleepDuration: 120000
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.crawler | indent 8 }}
+      resources:
+        requests:
+          memory: "60Mi"
+          cpu: "60m"
+    liveDirectory:
+      image: {{ index .Values.images "dcinside-crawler" }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      galleryKind: minor
+      resources:
+        requests:
+          memory: "150Mi"
+          cpu: "20m"
+- name: crawler-node-rotator
+  chart: ../charts/crawler-node-rotator
+  values:
+  - image: {{ index .Values.images "crawler-node-rotator" }}
+    nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+    targetNodeSelector:
+{{ toYaml .Values.nodeSelectors.crawler | indent 6 }}
+    lifetimeMin: 120
+    podLabel: "app.kubernetes.io/name=dc-crawler-worker"
+    maxNodeCount: 8
+- name: argo-suppliment
+  chart: ../charts/argo-suppliment
+  values:
+  - serviceAccountName: argo-workflow
+- name: argo
+  chart: argo/argo
+  version: 0.15.2
+  needs: [ argo-suppliment ]
+  values:
+  - singleNamespace: true
+  - useDefaultArtifactRepo: true
+  - artifactRepository:
+      archiveLogs: true
+      gcs:
+        bucket: comm-game
+        keyFormat: argo/artifacts/
+        serviceAccountKeySecret:
+          name: data-access
+          key: "service-account.json"
+  - server:
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      serviceType: NodePort
+  - controller:
+      workflowDefaults:
+        spec:
+          serviceAccountName: 'argo-workflow'
+          volumes:
+          - name: 'data-access-secrets'
+            secret: 
+              secretName: 'data-access'
+              defaultMode: 256
+      nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+- name: jupyter
+  installed: true
+  chart: ../charts/jupyter
+  version: 0.10.6
+  values:
+  - image: {{ index .Values.images "jupyter-singleuser" }}
+    token: {{ .Values.jupyter.token | quote }}
+    resources:
+      requests:
+        memory: 300Mi
+    extraEnv:
+      SPARK_EXTRA_CONFIGS: |
+        spark.kubernetes.executor.secrets.data-access=/run/data-access/
+    nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+    service:
+     type: ClusterIP
+    # nodePort: 30000
+    ingress:
+      enabled: true
+      hosts: 
+      - jupyter.dcgle.com
+      annotations:
+        kubernetes.io/ingress.class: "nginx"
+    spark:
+      executor:
+        image: {{ index .Values.images "spark" }}
+        nodeSelector: 
+{{ toYaml .Values.nodeSelectors.etl | indent 10 }}
+      service: 
+        type: NodePort
+        nodePort: 30001
+- name: etl
+  installed: true
+  chart: ../charts/etl
+  disableValidation: true
+  needs: [ argo ]
+  values:
+  - images:
+{{ toYaml .Values.images | indent 6 }}
+    nodeSelector: 
+{{ toYaml .Values.nodeSelectors.etl | indent 6 }}

@@ -1,0 +1,12 @@
+nodeSelector: 
+resources:
+replicas: 1
+image:
+  repository: bayardsearch/bayard
+  tag: 0.8.5
+schema:
+tokenizer: 
+rest:
+  image:
+    repository: bayardsearch/bayard-rest
+    tag: 0.8.5

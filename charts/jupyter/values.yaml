@@ -13,4 +13,11 @@ token: ''
 service:
   type: NodePort
   nodePort: 
-ingress: {}
+ingress:
+  enabled: false
+  hosts: []
+  annotations: []
+livenessProbe:
+  enabled: true
+readinessProbe:
+  enabled: true

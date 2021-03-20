@@ -1,0 +1,79 @@
+environments:
+  prod:
+    secrets:
+    - "../envs/{{ .Environment.Name }}/secrets.yaml"
+    values:
+    - "../envs/values.yaml"
+    - "../envs/{{ .Environment.Name }}/values.yaml.gotmpl"
+    - "../envs/{{ .Environment.Name }}/images.yaml"
+    - "../envs/{{ .Environment.Name }}/node-selectors.yaml"
+
+repositories:
+- name: grafana
+  url: "https://grafana.github.io/helm-charts"
+- name: vm
+  url: "https://victoriametrics.github.io/helm-charts/"
+- name: prometheus-community
+  url: "https://prometheus-community.github.io/helm-charts"
+
+releases:
+- name: vm-agent
+  installed: true
+  namespace: monitor
+  chart: vm/victoria-metrics-agent
+  values:
+  - remoteWriteUrls:
+    - "http://vm-single-victoria-metrics-single-server-0.vm-single-victoria-metrics-single-server:8428/api/v1/write"
+  - config:
+      global:
+        scrape_interval: 60s
+  - nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+- name: vm-single
+  installed: true
+  namespace: monitor
+  chart: vm/victoria-metrics-single
+  values:
+  - server:
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+- name: node-exporter
+  namespace: monitor
+  chart: prometheus-community/prometheus-node-exporter
+- name: grafana-suppliment
+  namespace: monitor
+  chart: ../charts/grafana-suppliment
+  values:
+  -
+{{ toYaml .Values.grafana | indent 4 }}
+- name: loki-stack
+  chart: grafana/loki-stack
+  namespace: monitor
+  needs: [ monitor/grafana-suppliment ]
+  values:
+  - prometheus:
+      enabled: false
+      server:
+        global:
+          scrape_interval: 1m
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+  - loki:
+      enabled: true
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+  - grafana:
+      enabled: true
+      admin:
+        existingSecret: "grafana-secret"
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      #service:
+      # type: NodePort
+      # nodePort: 30010
+      ingress:
+        enabled: true
+        hosts: 
+        - grafana.dcgle.com
+        annotations:
+          kubernetes.io/ingress.class: "nginx"

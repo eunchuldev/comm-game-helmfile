@@ -1,6 +1,11 @@
 images:
-  dcinside-crawler: gcr.io/comm-game/dcinside-crawler:0a8e6d0
+  dcinside-crawler: gcr.io/comm-game/dcinside-crawler:befb742
   spark: gcr.io/comm-game/spark:a8b6be3
-  jupyter-singleuser: gcr.io/comm-game/jupyter-singleuser:a8b6be3
+  jupyter-singleuser: gcr.io/comm-game/jupyter-singleuser:77ffeff
   gcloud-kubectl: gcr.io/community-gamification-301712/gcloud-kubectl:05fecaf
   crawler-node-rotator: gcr.io/comm-game/crawler-node-rotator:ebece50
+  tantivy-rest: gcr.io/comm-game/tantivy-rest:a84d691
+  vector: gcr.io/comm-game/vector:a84d69
+  bayard: gcr.io/comm-game/bayard:660b4e8
+  postgresql: gcr.io/comm-game/postgresql:670a97d
+  dcgle-web: gcr.io/comm-game/dcgle-web:6747786

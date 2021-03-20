@@ -5,3 +5,8 @@ image:
   repository: gcr.io/comm-game/tantivy-rest
   tag: 6981c71
 schema: 
+tokenizer: 
+logLevel: ERROR
+commitIntervalInSeconds: "10"
+indexWriterThreads: "1"
+indexWriterMemoryInBytes: "200000000"

@@ -22,4 +22,3 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
   rm -rf /var/cache/apt/* 
 
 USER 1001
-

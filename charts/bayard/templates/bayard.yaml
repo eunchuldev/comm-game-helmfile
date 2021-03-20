@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/name: bayard
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  name: {{ .Release.Name }}
+spec:
+  podManagementPolicy: Parallel
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  serviceName: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bayard
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        configHash: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9000'
+    spec:
+      containers:
+      - name: "rest"
+        image: {{ .Values.rest.image.repository }}:{{.Values.rest.image.tag }}
+        imagePullPolicy: "IfNotPresent"
+        ports:
+        - containerPort: 8000
+          name: http
+        command: [bayard-rest]
+        env:
+          - name: RUST_LOG
+            value: {{ .Values.logLevel }}
+        args:
+          - --port=8000
+          - --index-address=0.0.0.0:5000
+          - --worker-threads=1
+        resources:
+{{ toYaml .Values.rest.resources | indent 10 }}
+      - name: "bayard"
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: "IfNotPresent"
+        env:
+          - name: RUST_LOG
+            value: debug
+        ports:
+        - containerPort: 7000
+          name: index
+        - containerPort: 5000
+          name: raft
+        - containerPort: 9000
+          name: metrics
+        volumeMounts:
+          - mountPath: "/config"
+            name: config
+          - mountPath: "/data"
+            name: data
+        command:
+          - bash
+          - -c
+        args:
+          - |
+            INDEX="$(( ${HOSTNAME##*-} + 1))"
+            echo "index is $INDEX"
+            if [ "$INDEX" -le  1 ]; then
+              bayard \
+              --host=0.0.0.0 \
+              --raft-port=7000 \
+              --index-port=5000 \
+              --metrics-port=9000 \
+              --data-directory=/data \
+              --schema-file=/config/schema.json \
+              --tokenizer-file=/config/tokenizer.json \
+              "$INDEX"
+            else
+              bayard \
+              --host=0.0.0.0 \
+              --raft-port=7000 \
+              --index-port=5000 \
+              --metrics-port=9000 \
+              --data-directory=/data \
+              --peer-raft-address={{ .Release.Name }}-0.{{ .Release.Name }}:7000 \
+              --schema-file=/config/schema.json \
+              --tokenizer-file=/config/tokenizer.json \ 
+              "$INDEX"
+            fi
+        {{- if .Values.resources }}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+        {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}
+        - name: data
+          emptyDir: {}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      {{- end }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: bayard
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  name: {{ .Release.Name }}
+spec:
+  ports:
+    - port: 5000
+      name: index
+    - port: 7000
+      name: raft
+    - port: 8000
+      name: http
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  type: ClusterIP

@@ -48,7 +48,7 @@
     "type": "text",
     "options": {
       "indexing": {
-        "record": "basic",
+        "record": "position",
         "tokenizer": "koNgram"
       },
       "stored": true

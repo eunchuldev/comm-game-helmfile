@@ -1,24 +1,12 @@
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: jupyter
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 3Gi
-
----
-
 apiVersion: "apps/v1"
-kind: "Deployment"
+kind: "StatefulSet"
 metadata:
   labels:
     app: jupyter
   name: jupyter
 spec:
   replicas: 1
+  serviceName: jupyter
   selector:
     matchLabels:
       app: jupyter
@@ -66,6 +54,7 @@ spec:
 {{ toYaml .Values.resources | indent 10 }}
         {{- end }}
         command: ["start.sh", "jupyter",  "lab", "--NotebookApp.token={{ .Values.token }}"]
+        {{- if .Values.livenessProbe.enabled }}
         livenessProbe:
           httpGet:
             path: /robots.txt
@@ -73,6 +62,8 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
           failureThreshold: 2
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
         readinessProbe:
           httpGet:
             path: /robots.txt
@@ -80,6 +71,7 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
           failureThreshold: 2
+        {{- end }}
       securityContext:
         runAsUser: 1000
         fsGroup: 100
@@ -87,13 +79,18 @@ spec:
       - name: data-access
         secret:
           secretName: data-access
-      - name: workspace
-        persistentVolumeClaim:
-          claimName: jupyter
       {{- if .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
       {{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: workspace
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
 
 ---
 
@@ -117,15 +114,24 @@ spec:
 
 ---
 
-{{ if .Values.ingress }}
+{{ if .Values.ingress.enabled }}
 apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
   name: jupyter
+  annotations:
+{{ toYaml .Values.ingress.annotations | indent 4 }}
 spec:
-  backend:
-    serviceName: jupyter
-    servicePort: jupyter
+  rules:
+  {{- range .Values.ingress.hosts }}
+  - host: {{ . }} 
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: jupyter
+          servicePort: jupyter
+  {{- end }}
 {{ end }}
 
 ---

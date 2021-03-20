@@ -1,3 +1,5 @@
 target
-svelte-app/node_modules
-svelte-app/public/build
+server/target
+model/target
+server/svelte-app/node_modules
+server/svelte-app/public/build

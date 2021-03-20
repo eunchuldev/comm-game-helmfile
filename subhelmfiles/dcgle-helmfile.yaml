@@ -1,0 +1,155 @@
+environments:
+  prod:
+    secrets:
+    - "../envs/{{ .Environment.Name }}/secrets.yaml"
+    values:
+    - "../envs/values.yaml"
+    - "../envs/{{ .Environment.Name }}/values.yaml.gotmpl"
+    - "../envs/{{ .Environment.Name }}/images.yaml"
+    - "../envs/{{ .Environment.Name }}/node-selectors.yaml"
+    - "../envs/{{ .Environment.Name }}/external-ips.yaml"
+
+repositories:
+- name: elastic 
+  url: https://helm.elastic.co
+- name: bitnami
+  url: https://charts.bitnami.com/bitnami
+
+releases:
+- name: bayard-dc-docs
+  chart: ../charts/bayard
+  installed: false
+  values:
+  - rest:
+      image:
+        repository: {{ (split ":" (index .Values.images "bayard"))._0 }}
+        tag: {{ (split ":" (index .Values.images "bayard"))._1 }}
+    image:
+      repository: {{ (split ":" (index .Values.images "bayard"))._0 }}
+      tag: {{ (split ":" (index .Values.images "bayard"))._1 }}
+    resources.back:
+      requests:
+        memory: 1Gi
+        cpu: 100m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+  - schema: |
+{{ readFile "../bayard-schema/dcinside-document.json" | indent 6 }}
+  - tokenizer: |
+{{ readFile "../bayard-schema/tokenizer.json" | indent 6 }}
+  - logLevel: INFO
+  - nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+  - schema: |
+{{ readFile "../tantivy-schema/dcinside-document.json" | indent 6 }}
+  - tokenizer: |
+{{ readFile "../tantivy-schema/tokenizer.json" | indent 6 }}
+  - commitIntervalInSeconds: 60
+- name: tantivy-rest-dcinside-docs
+  chart: ../charts/tantivy-rest
+  installed: false
+  values:
+  - resources:
+      requests:
+        memory: 1Gi
+        cpu: 100m
+      limits: 
+        memory: 1Gi
+        cpu: 500m
+  - logLevel: INFO
+  - image: 
+      repository: {{ (split ":" (index .Values.images "tantivy-rest"))._0 }}
+      tag: {{ (split ":" (index .Values.images "tantivy-rest"))._1 }}
+  - nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+  - schema: |
+{{ readFile "../tantivy-schema/dcinside-document.json" | indent 6 }}
+  - tokenizer: |
+{{ readFile "../tantivy-schema/tokenizer.json" | indent 6 }}
+  - commitIntervalInSeconds: 60
+- name: toshi
+  chart: ../charts/toshi
+  installed: false 
+  values:
+  - nodeSelector: 
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+  - image:
+      repository: gcr.io/comm-game/toshi
+      tag: 6981c71
+- name: elasticsearch
+  chart: elastic/elasticsearch
+  installed: false
+  values:
+  - nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+- name: searchdb
+  chart: bitnami/postgresql
+  installed: true
+  values:
+  - image:
+      registry: gcr.io
+      repository: comm-game/postgresql
+      tag: {{ (split ":" (index .Values.images "postgresql"))._1 }}
+  - postgresqlUsername: dcgle
+  - postgresqlPassword: dcgle
+  - postgresqlDatabase: dcgle
+  - persistence:
+      enabled: true
+      size: 100G
+  - initdbScripts:
+      00_extension.sh: |
+        #!/bin/sh
+        PGPASSWORD=o9jN7yY2It psql -U postgres dcgle << EOL
+        CREATE EXTENSION rum;
+        EOL
+      01_anonrole.sh: |
+        #!/bin/sh
+        PGPASSWORD=o9jN7yY2It psql -U postgres dcgle << EOL
+          CREATE ROLE rest nologin;
+          GRANT USAGE ON SCHEMA public TO rest;
+          GRANT SELECT, INSERT, UPDATE, DELETE
+            ON ALL TABLES IN SCHEMA public
+            TO rest;
+          ALTER DEFAULT PRIVILEGES
+            FOR ROLE rest
+            IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO rest;
+        EOL
+  - resources:
+      requests:
+        memory: 1Gi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+  - primary:
+      sidecars:
+      - name: rest
+        image: postgrest/postgrest
+        ports:
+        - name: rest
+          containerPort: 3000
+        env:
+        - name: PGRST_DB_URI
+          value: postgres://dcgle:dcgle@127.0.0.1:5432/dcgle
+        - name: PGRST_DB_SCEHMA
+          value: public
+        - name: PGRST_DB_ANON_ROLE
+          value: rest
+    nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}
+- name: dcgle-web
+  chart: ../charts/dcgle-web
+  installed: true
+  values:
+  - image: {{ index .Values.images "dcgle-web" }}
+  - databaseUrl: postgresql://dcgle:dcgle@searchdb-postgresql/dcgle
+  - ingress:
+      enabled: true
+      hosts:
+      - dcgle.com
+      annotations:
+        kubernetes.io/ingress.class: "nginx"
+  - nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 6 }}

@@ -1,0 +1,27 @@
+"DateTime"
+scalar DateTimeUtc
+
+type Document {
+  galleryId: String!
+  id: Int!
+  title: String!
+  subject: String
+  authorNickname: String!
+  authorIp: String
+  authorId: String
+  commentCount: Int!
+  likeCount: Int!
+  viewCount: Int!
+  kind: String!
+  isRecommend: Boolean!
+  createdAt: DateTimeUtc!
+}
+
+type Query {
+  apiVersion: String!
+  documents(galleryId: String, title: String, authorNickname: String, authorIp: String, authorId: String, lastCreatedAt: DateTimeUtc): [Document!]!
+}
+
+schema {
+  query: Query
+}

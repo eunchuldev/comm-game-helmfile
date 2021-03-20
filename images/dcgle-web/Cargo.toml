@@ -1,28 +1,6 @@
-[package]
-name = "server"
-version = "0.1.0"
-authors = ["Eunchul Song <eunchulsong9@gmail.com>"]
-edition = "2018"
+[workspace]
+members = [
+  "model",
+  "server",
+]
 
-[lib]
-path = "src/lib.rs"
-
-[dependencies]
-actix-web = "4.0.0-beta.3"
-actix-rt = "2"
-actix-files = "0.6.0-beta.2"
-serde_json = "1"
-serde = { version = "1", features = ["derive"] }
-
-clap = "3.0.0-beta.2"
-pretty_env_logger = "0.4"
-log = "0.4"
-futures = "0.3"
-
-async-lock = "2"
-chrono = { version = "0.4", features = ["serde"] }
-prometheus = "0.11"
-thiserror = "1"
-lazy_static = "*"
-
-sqlx = { version = "0.5", features = [ "runtime-actix-rustls", "postgres", "sqlite", "migrate", "chrono" ] }

@@ -1,6 +1,11 @@
 apiVersion: "v1"
 data:
   vector.toml: |
+    [sources.dc_doc]
+    address = "0.0.0.0:8080"
+    encoding = "ndjson"
+    type = "http"
+
     [sinks.gcs]
     type = "gcp_cloud_storage"
     inputs = ["dc_doc"]
@@ -10,11 +15,6 @@ data:
     key_prefix = {{ printf "%s/%s" (trimSuffix "/" .Values.dataBroker.prefix) "date=%F/hour=%H/" | quote }}
     metadata = { Content-Encoding = "" }
 
-    [sources.dc_doc]
-    address = "0.0.0.0:8080"
-    encoding = "ndjson"
-    type = "http"
-
     [sources.internal_metrics]
     type = "internal_metrics" 
 
@@ -22,6 +22,10 @@ data:
     type = "prometheus_exporter"
     inputs = [ "internal_metrics" ]
     address = "0.0.0.0:9598"
+
+    {{- if .Values.dataBroker.extraConfigs }}
+{{ .Values.dataBroker.extraConfigs | indent 4 }}
+    {{- end }}
 kind: "ConfigMap"
 metadata:
   name: dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}

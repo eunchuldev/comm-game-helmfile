@@ -1,0 +1,13 @@
+image:
+nodeSelector: 
+resources:
+replicas: 1
+logLevel: INFO
+databaseUrl:
+externalIPs: []
+service:
+  type: ClusterIP
+ingress:
+  enabled: false
+  hosts: []
+  annotations: {}

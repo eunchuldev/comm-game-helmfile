@@ -20,11 +20,11 @@ COPY --from=builder \
     /usr/local/bin/
 
 COPY --from=builder \
-    /home/rust/src/svelte-app/public \
+    /home/rust/src/server/svelte-app/public \
     svelte-app/public
 
 COPY --from=builder \
-    /home/rust/src/migrations \
+    /home/rust/src/model/migrations \
     migrations
 
 ENTRYPOINT server

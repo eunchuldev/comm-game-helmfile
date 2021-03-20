@@ -28,7 +28,8 @@ spec:
           - mountPath: "/data"
             name: data
         command: ['sh', '-c']
-        args: -|
+        args: 
+        - |
           toshi &
           sleep 3
           for f in /schema/*; do

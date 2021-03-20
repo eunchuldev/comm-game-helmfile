@@ -1,0 +1,27 @@
+{
+  "raw": {
+    "tokenizer": {
+      "name": "raw"
+    }
+  },
+  "ko-ngram": {
+    "tokenizer": {
+      "name": "ngram",
+      "args": {
+        "min_gram": 1,
+        "max_gram": 10,
+        "prefix_only": false
+      }
+    },
+    "filters": [
+      { 
+        "name": "regex",
+        "args": {
+          "re": "[^A-Za-z0-9ㄱ-ㅎㅏ-ㅣ가-힣~!?.,():;*/=+\\-\\[\\]\\s\\n<>]",
+          "replacer": ""
+        }
+      },
+      { "name": "lower_case" }
+    ]
+  }
+}
