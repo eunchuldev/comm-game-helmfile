@@ -22,9 +22,10 @@
   }
 
   let documents = operationStore(`
-    query ($galleryId: String, $title: String, $authorNickname: String, $authorIp: String, $authorId: String, $lastCreatedAt: DateTimeUtc) {
+    query ($galleryId: String, $galleryName: String, $title: String, $authorNickname: String, $authorIp: String, $authorId: String, $lastCreatedAt: DateTimeUtc) {
       documents (galleryId: $galleryId, title: $title, authorNickname: $authorNickname, authorIp: $authorIp, authorId: $authorId, lastCreatedAt: $lastCreatedAt) {
         galleryId
+        galleryName
         id
         title
         authorId

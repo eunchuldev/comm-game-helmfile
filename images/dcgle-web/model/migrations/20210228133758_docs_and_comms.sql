@@ -1,5 +1,15 @@
 -- Add migration script here
 
+CREATE TABLE dcinside_gallery (
+  id TEXT,
+  name TEXT,
+  kind TEXT
+);
+
+CREATE INDEX ON dcinside_gallery USING gin (name gin_trgm_ops);
+CREATE INDEX ON dcinside_gallery id;
+
+
 CREATE FUNCTION vgram(text text, min integer default 2, max integer default 20) RETURNS tsvector AS $BODY$ BEGIN
   RETURN array_to_tsvector((select array_agg(substring(lexeme, l1, l2)) from unnest(string_to_array(REGEXP_REPLACE(text, '[^A-Za-z가-힣ㅏ-ㅣㄱ-ㅎ0-9*;(),.@~#\s]', ''), ' ')) lexeme, generate_series(1, length(lexeme)) l1, generate_series(greatest(1, min), least(length(lexeme)-l1+1, max)) l2));
 END; $BODY$ IMMUTABLE language plpgsql;

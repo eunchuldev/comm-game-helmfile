@@ -9,6 +9,8 @@ pub enum Error {
     DatabaseMigrate(#[from] sqlx::migrate::MigrateError),
     #[error("invalid request form. method={0:?} detail={1:?}")]
     BadRequest(&'static str, &'static str),
+    #[error("invalid request form. method={0:?} detail={1:?}")]
+    NotImplemented(&'static str, &'static str),
 }
 
 impl<S: juniper::ScalarValue> juniper::IntoFieldError<S> for Error {
@@ -28,6 +30,14 @@ impl<S: juniper::ScalarValue> juniper::IntoFieldError<S> for Error {
                 }),
             ),
             Error::DatabaseMigrate(_) => panic!("graphql meet migration error"),
+            Error::NotImplemented(method, detail) => juniper::FieldError::new(
+                "Not implemented",
+                graphql_value!({
+                    "method": method,
+                    "detail": detail,
+                }),
+            ),
+
         }
     }
 }

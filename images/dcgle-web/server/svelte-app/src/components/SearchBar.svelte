@@ -4,9 +4,9 @@
     { id: '', text: '전체 갤러리' },
   ];
   const SearchFieldOptions = [
-		{ id: 'titleOrContents', text: `제목/댓글` },
-		{ id: 'authorId', text: `아이디` },
+		//{ id: 'titleOrContents', text: `제목/댓글` },
 		{ id: 'authorNickname', text: `닉네임` },
+		{ id: 'authorId', text: `아이디` },
 		{ id: 'authorIp', text: `아이피` },
 	];
   export let kind = 'document';

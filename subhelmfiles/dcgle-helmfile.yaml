@@ -102,6 +102,7 @@ releases:
         #!/bin/sh
         PGPASSWORD=o9jN7yY2It psql -U postgres dcgle << EOL
         CREATE EXTENSION rum;
+        CREATE EXTENSION pg_trgm;
         EOL
       01_anonrole.sh: |
         #!/bin/sh

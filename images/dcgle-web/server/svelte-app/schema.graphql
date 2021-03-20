@@ -1,8 +1,15 @@
+type Gallery {
+  id: String!
+  name: String!
+  kind: String!
+}
+
 "DateTime"
 scalar DateTimeUtc
 
 type Document {
   galleryId: String!
+  galleryName: String!
   id: Int!
   title: String!
   subject: String
@@ -19,6 +26,7 @@ type Document {
 
 type Query {
   apiVersion: String!
+  galleries(namePart: String, id: String): [Gallery!]!
   documents(galleryId: String, title: String, authorNickname: String, authorIp: String, authorId: String, lastCreatedAt: DateTimeUtc): [Document!]!
 }
 
