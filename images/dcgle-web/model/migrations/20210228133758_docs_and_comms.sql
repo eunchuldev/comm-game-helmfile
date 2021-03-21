@@ -1,4 +1,5 @@
 -- Add migration script here
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE TABLE dcinside_gallery (
   id TEXT,
@@ -7,7 +8,7 @@ CREATE TABLE dcinside_gallery (
 );
 
 CREATE INDEX ON dcinside_gallery USING gin (name gin_trgm_ops);
-CREATE INDEX ON dcinside_gallery id;
+CREATE INDEX ON dcinside_gallery (id);
 
 
 CREATE FUNCTION vgram(text text, min integer default 2, max integer default 20) RETURNS tsvector AS $BODY$ BEGIN
@@ -21,7 +22,7 @@ END; $BODY$ IMMUTABLE language plpgsql;
 
 CREATE TABLE dcinside_document (
   gallery_id TEXT,
-  id BIGINT,
+  id INT,
   title TEXT NOT NULL DEFAULT '',
   subject TEXT,
   author_nickname TEXT NOT NULL,

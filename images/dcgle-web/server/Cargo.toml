@@ -5,28 +5,31 @@ authors = ["Eunchul Song <eunchulsong9@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-actix-web = "4.0.0-beta.3"
-actix-rt = "2"
-actix-files = "0.6.0-beta.2"
-serde_json = "1"
-serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = [ "rt", "macros" ] }
+
+warp = "0.3"
+async-graphql = "2.6"
+async-graphql-warp = "2.6"
+http = "0.2"
+
+# serde_json = "1"
+# serde = { version = "1", features = ["derive"] }
 
 clap = "3.0.0-beta.2"
 pretty_env_logger = "0.4"
 log = "0.4"
 futures = "0.3"
 
-async-lock = "2"
 prometheus = "0.11"
-anyhow = "1"
+thiserror = "1"
 lazy_static = "*"
-
-juniper = { version = "0.15.3", default-features = false }
 
 model = { path = "../model" }
 
 [dev-dependencies]
-juniper = { version = "0.15.3", features = ["expose-test-schema"] }
+serial_test = "0.5"
+sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "postgres", "sqlite", "migrate", "chrono" ] }
+chrono = { version = "0.4", features = ["serde"] }
 
 [build-dependencies]
 model = { path = "../model" }

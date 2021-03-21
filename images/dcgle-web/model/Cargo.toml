@@ -13,10 +13,11 @@ serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
 
-sqlx = { version = "0.5", features = [ "runtime-actix-rustls", "postgres", "sqlite", "migrate", "chrono" ] }
+sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "postgres", "sqlite", "migrate", "chrono" ] }
 
-juniper = { version = "0.15.3", default-features = false }
+async-graphql = { version = "2.6" }
 
 
 [dev-dependencies]
-juniper = { version = "0.15.3", features = ["expose-test-schema"] }
+tokio = { version = "1", features = ["rt", "macros"] }
+serial_test = "0.5"
