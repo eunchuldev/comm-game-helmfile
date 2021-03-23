@@ -33,6 +33,10 @@ pub enum WorkerError {
     Serde(#[source] serde_json::Error),
     #[error(display = "err http response: {}", _0)]
     Response(StatusCode),
+    #[error(display = "nats connect error: {}", _0)]
+    NatsConnect(std::io::Error),
+    #[error(display = "nats publish error: {}", _0)]
+    NatsPublish(std::io::Error),
 }
 
 #[derive(Serialize)]
@@ -44,6 +48,7 @@ pub struct ListPartQuery {
 #[derive(Clone)]
 struct State {
     crawler: Crawler,
+    nats_conn: nats::Connection,
     live_directory_url: String,
     data_broker_url: String,
     part: u64,
@@ -61,15 +66,16 @@ struct ResultMetric {
     comment_error: usize,
 }
 impl State {
-    fn new(live_directory_url: &str, data_broker_url: &str, total: u64, part: u64) -> Self {
-        State {
+    fn new(live_directory_url: &str, data_broker_url: &str, nats_url: &str, total: u64, part: u64) -> Result<Self, WorkerError> {
+        Ok(State {
             crawler: Crawler::new(),
             live_directory_url: live_directory_url.to_string(),
+            nats_conn: nats::connect(nats_url).map_err(|e| WorkerError::NatsConnect(e))?,
             data_broker_url: data_broker_url.to_string(),
             total,
             part,
             start_page: 2,
-        }
+        })
     }
     fn crawler_delay(mut self, v: u64) -> Self {
         self.crawler = self.crawler.delay(v);
@@ -129,6 +135,10 @@ impl State {
             .post(&self.data_broker_url)
             .send_json(data)
             .await?;
+        let nats_res = self.nats_conn.publish("dcinside_document", &serde_json::to_string(&data).unwrap());
+        if let Err(e) = nats_res {
+            error!("nats publish fail due to: {}", e.to_string());
+        }
         if res.status() == StatusCode::OK {
             Ok(())
         } else {
@@ -311,6 +321,7 @@ async fn main() -> std::io::Result<()> {
 
     let live_directory_url = std::env::var("LIVE_DIRECTORY_URL").expect("LIVE_DIRECTORY_URL");
     let data_broker_url = std::env::var("DATA_BROKER_URL").expect("DATA_BROKER_URL");
+    let nats_url = std::env::var("NATS_URL").expect("NATS_URL");
 
     let part: u64 = std::env::var("PART").expect("PART").parse().expect("PART");
     let total: u64 = std::env::var("TOTAL")
@@ -353,7 +364,7 @@ async fn main() -> std::io::Result<()> {
     actix_rt::spawn(async move {
         loop {
             let state =
-                State::new(&live_directory_url, &data_broker_url, total, part).crawler_delay(delay);
+                State::new(&live_directory_url, &data_broker_url, &nats_url, total, part).unwrap().crawler_delay(delay);
             let res = crawl_forever(
                 state,
                 Duration::from_millis(sleep_duration),

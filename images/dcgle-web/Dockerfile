@@ -27,4 +27,4 @@ COPY --from=builder \
     /home/rust/src/model/migrations \
     migrations
 
-ENTRYPOINT server
+ENTRYPOINT ["server"]

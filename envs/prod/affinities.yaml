@@ -1,0 +1,16 @@
+affinities:
+  etl: 
+    cloud.google.com/gke-nodepool: etl-pool
+  crawler:
+    cloud.google.com/gke-nodepool: crawler-pool
+  system:
+    cloud.google.com/gke-nodepool: default-pool
+  alwaysOn:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: cloud.google.com/gke-nodepool
+                operator: In
+                values:
+                  - default-pool

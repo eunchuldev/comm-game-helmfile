@@ -7,12 +7,79 @@ environments:
     - "../envs/{{ .Environment.Name }}/values.yaml.gotmpl"
     - "../envs/{{ .Environment.Name }}/images.yaml"
     - "../envs/{{ .Environment.Name }}/node-selectors.yaml"
+    - "../envs/{{ .Environment.Name }}/affinities.yaml"
 
 repositories:
 - name: argo
   url: "https://argoproj.github.io/argo-helm"
+- name: nats
+  url: https://nats-io.github.io/k8s/helm/charts/
 
 releases:
+- name: nats
+  chart: nats/nats
+  values:
+  - cluster:
+      enabled: true
+    jetstream:
+      enabled: true
+      memStorate:
+        enabled: true
+        size: 512Mi
+      fileStorage:
+        enabled: true
+        size: 10Gi
+    exporter:
+      enabled: true
+    nats:
+      resources:
+        #requests:
+          #cpu: 100m
+          #memory: 512Mi
+        #limits:
+          #cpu: 300m
+          #memory: 1Gi
+    natsbox:
+      enabled: false
+    affinity:
+{{ toYaml .Values.affinities.alwaysOn | indent 6 }}
+- name: nsq
+  chart: ../charts/nsq
+  values:
+  - nsqd:
+      name: nsqd
+      replicaCount: 1
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      persistence:
+        storageClass: "default"
+        resources:
+          requests:
+            storage: 10Gi
+      resources:
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    nsqlookupd:
+      name: nsqlookupd
+      replicaCount: 1
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      resources:
+        limits:
+          cpu: 50m
+          memory: 32Mi
+    nsqadmin:
+      name: "admin"
+      autoscaling:
+        enabled: false
+      replicaCount: 1
+      nodeSelector:
+{{ toYaml .Values.nodeSelectors.alwaysOn | indent 8 }}
+      resources:
+          limits:
+            cpu: 50m
+            memory: 32Mi
 - name: data-access-secrets
   chart: ../charts/data-access-secrets
   values:

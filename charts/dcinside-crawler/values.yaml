@@ -24,3 +24,6 @@ dataBroker:
   nodeSelector:
     cloud.google.com/gke-nodepool: default-pool
   resources: {}
+nats:
+  host: nats
+  port: 4222

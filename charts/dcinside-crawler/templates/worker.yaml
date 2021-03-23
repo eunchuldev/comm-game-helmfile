@@ -32,6 +32,8 @@ spec:
           value: {{ .Values.worker.replicas | quote }}
         - name: DATA_BROKER_URL
           value: "http://dc-crawler-data-broker-{{ .Values.liveDirectory.galleryKind }}:8080"
+        - name: NATS_URL
+          value: "{{ .Values.nats.host}}:{{ .Values.nats.port }}"
         - name: DELAY
           value: {{ .Values.worker.delay | quote }}
         - name: SLEEP_DURATION

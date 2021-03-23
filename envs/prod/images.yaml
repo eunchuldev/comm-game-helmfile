@@ -8,4 +8,4 @@ images:
   vector: gcr.io/comm-game/vector:a84d69
   bayard: gcr.io/comm-game/bayard:660b4e8
   postgresql: gcr.io/comm-game/postgresql:670a97d
-  dcgle-web: gcr.io/comm-game/dcgle-web:c17ae0f
+  dcgle-web: gcr.io/comm-game/dcgle-web:2744f33

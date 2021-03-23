@@ -57,8 +57,9 @@ pub mod filters {
 
     pub fn front() 
         -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-         warp::path("static")
-            .and(warp::fs::dir("svelte-app/public"))
+        warp::fs::dir("svelte-app/public")
+         /*warp::path("")
+            .and(warp::fs::dir("svelte-app/public"))*/
     }
 
     pub fn graphql_post(schema: Schema) 
