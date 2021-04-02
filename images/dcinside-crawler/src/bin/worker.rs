@@ -416,10 +416,11 @@ mod tests {
             id: 1,
             title: s(),
             subject: Some(s()),
-            author: User::Dynamic {
-                ip: s(),
+            author: User {
+                ip: Some(s()),
                 nickname: s(),
                 id: None,
+                kind: UserKind::Dynamic,
             },
             comment_count: 1,
             like_count: 2,
@@ -431,10 +432,11 @@ mod tests {
             comments: Some(vec![
                 Comment {
                     id: 1,
-                    author: User::Static {
+                    author: User {
                         ip: None,
                         nickname: s(),
-                        id: s(),
+                        id: Some(s()),
+                        kind: UserKind::Static,
                     },
                     depth: 0,
                     kind: CommentKind::Text,

@@ -539,11 +539,13 @@ mod tests {
         let res = crawler.comments(&gallery, 1595404).await.unwrap();
         assert!(!res.is_empty());
         assert!(!res.is_empty());
-        assert!(!res.iter().any(|c| match &c.author {
-            User::Static { id, .. } => id.is_empty(),
-            User::Dynamic { ip, .. } => ip.is_empty(),
-            _ => false,
-        }));
+        for c in res {
+            match c.author.kind {
+                UserKind::Static => assert!(c.author.id.is_some()),
+                UserKind::Dynamic  => assert!(c.author.ip.is_some()),
+                UserKind::Unknown  => assert_eq!(c.author.nickname, "댓글돌이".to_string()),
+            }
+        }
         /*assert!(res.iter().any(|c| d.comment_count > 0));
         assert!(res.iter().any(|c| if DocumentKind::Picture == d.kind {
             true

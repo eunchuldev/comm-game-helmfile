@@ -142,6 +142,30 @@ where
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub enum UserKind { Static, Dynamic, Unknown }
+
+impl UserKind {
+    fn parse<T1: AsRef<str>, T2: AsRef<str>>(id: &Option<T1>, ip: &Option<T2>) -> Self {
+        match (id, ip) {
+            (Some(t), None) if !t.as_ref().is_empty() => Self::Static,
+            (Some(t), Some(u)) if !t.as_ref().is_empty() && u.as_ref().is_empty() => Self::Static,
+            (None, Some(t)) if !t.as_ref().is_empty() => Self::Dynamic,
+            (Some(t), Some(u)) if t.as_ref().is_empty() && !u.as_ref().is_empty() => Self::Dynamic,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub struct User {
+    pub id: Option<String>,
+    pub ip: Option<String>,
+    pub nickname: String,
+    pub kind: UserKind,
+}
+
+/*
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum User {
     Static {
@@ -168,7 +192,7 @@ pub enum User {
         #[serde(skip_deserializing)]
         id: Option<bool>,
     },
-}
+}*/
 
 pub fn deserialize_string_or_int<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
@@ -403,7 +427,13 @@ impl<'de> Deserialize<'de> for Comment {
                             StringOrInt::String(s) => s.parse().map_err(|_| de::Error::custom("field `no` should number_string"))?,
                             StringOrInt::Number(u) => u,
                         },
-                        author: match (author_ip, author_id) {
+                        author: User {
+                            kind: UserKind::parse(&author_id, &author_ip),
+                            nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
+                            ip: author_ip.and_then(|i| if i.is_empty() { None } else { Some(i) }),
+                            id: author_id.and_then(|i| if i.is_empty() { None } else { Some(i) }),
+                        },
+                        /*author: match (author_ip, author_id) {
                             (Some(author_ip), None) if !author_ip.is_empty() => User::Dynamic {
                                 nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
                                 ip: author_ip,
@@ -429,7 +459,7 @@ impl<'de> Deserialize<'de> for Comment {
                                 ip: None,
                                 id: None,
                             },
-                        },
+                        },*/
                         depth: depth.ok_or_else(|| de::Error::missing_field("depth"))?,
                         contents: contents.ok_or_else(|| de::Error::missing_field("memo"))?,
                         kind: kind.ok_or_else(|| de::Error::missing_field("memo"))?,
@@ -528,7 +558,13 @@ pub fn parse_document_indexes(
                     })?;
                 let ip = writer_node.attr("data-ip");
                 let id = writer_node.attr("data-uid");
-                match (id, ip) {
+                User {
+                    nickname: nickname.into(),
+                    kind: UserKind::parse(&id, &ip),
+                    id: id.and_then(|i| if i.is_empty() { None } else { Some(i.to_owned()) }),
+                    ip: ip.and_then(|i| if i.is_empty() { None } else { Some(i.to_owned()) }),
+                }
+                /*match (id, ip) {
                     (Some(id), None) => Ok(User::Static {
                         id: id.into(),
                         nickname: nickname.into(),
@@ -553,7 +589,7 @@ pub fn parse_document_indexes(
                         path: ".us-post .gall_writer@(data-ip | data-id)",
                         html: body.to_string(),
                     }),
-                }?
+                }?*/
             };
             let comment_count = node
                 .select(Class("reply_numbox"))
@@ -811,13 +847,13 @@ mod tests {
         assert!(!res.is_empty());
         assert!(max_page == 10usize);
         assert!(res.len() >= 50);
-        assert!(!res.iter().any(|c| match &c.author {
-            User::Static { id, .. } => id.is_empty(),
-            User::Dynamic { ip, .. } => ip.is_empty(),
-            User::Unknown { .. } => {
-                false
+        for c in res {
+            match c.author.kind {
+                UserKind::Static => assert!(c.author.id.is_some()),
+                UserKind::Dynamic  => assert!(c.author.ip.is_some()),
+                UserKind::Unknown  => assert_eq!(c.author.nickname, "댓글돌이".to_string()),
             }
-        }));
+        }
     }
     #[test]
     fn it_deserializes_comments() {
@@ -829,7 +865,7 @@ mod tests {
         )
         .unwrap();
         let res = serde_json::to_string(&res[0]).unwrap();
-        let expected = "{\"id\":13369033,\"author\":{\"ip\":\"119.195\",\"nickname\":\"ㅇㅇ\",\"id\":null},\"depth\":0,\"contents\":\"이제 뻑가,이슈왕 같은 랙카들이 청원하라고 한번 더 할듯ㅋㅋ  - dc App\",\"kind\":\"Text\",\"parent_id\":null,\"created_at\":\"2021-01-10T08:20:43Z\"}".to_string();
+        let expected = "{\"id\":13369033,\"author\":{\"id\":null,\"ip\":\"119.195\",\"nickname\":\"ㅇㅇ\",\"kind\":\"Dynamic\"},\"depth\":0,\"contents\":\"이제 뻑가,이슈왕 같은 랙카들이 청원하라고 한번 더 할듯ㅋㅋ  - dc App\",\"kind\":\"Text\",\"parent_id\":null,\"created_at\":\"2021-01-10T08:20:43Z\"}".to_string();
         assert_eq!(expected, res);
         //assert_eq!(!res[0], Comment{});
     }
@@ -843,7 +879,7 @@ mod tests {
         )
         .unwrap();
         let res = serde_json::to_string(&res[0]).unwrap();
-        let expected = "{\"id\":4649463,\"author\":{\"id\":\"nasdaqtrader\",\"nickname\":\"오함마의현인.\",\"ip\":null},\"depth\":0,\"contents\":\"개추\",\"kind\":\"Text\",\"parent_id\":null,\"created_at\":\"2020-12-31T07:44:47Z\"}".to_string();
+        let expected = "{\"id\":4649463,\"author\":{\"id\":\"nasdaqtrader\",\"ip\":null,\"nickname\":\"오함마의현인.\",\"kind\":\"Static\"},\"depth\":0,\"contents\":\"개추\",\"kind\":\"Text\",\"parent_id\":null,\"created_at\":\"2020-12-31T07:44:47Z\"}".to_string();
         assert_eq!(expected, res);
         //assert_eq!(!res[0], Comment{});
     }
