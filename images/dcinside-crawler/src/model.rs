@@ -825,6 +825,17 @@ mod tests {
         assert!(res.iter().any(|d| DocumentKind::Picture == d.kind));
     }
     #[test]
+    fn it_parses_problmetic_gallery1() {
+        let res =
+            parse_document_indexes(include_str!("../assets/gallery-problemtic.html"), "gallery_id").unwrap();
+        let res: Vec<_> = res.into_iter().map(|d| d.unwrap()).collect();
+        assert!(!res.is_empty());
+        assert!(res.len() >= 20);
+        assert!(res.iter().any(|d| d.comment_count > 0));
+        assert!(res.iter().any(|d| DocumentKind::Picture == d.kind));
+    }
+
+    #[test]
     fn it_parses_minor_document_indexes() {
         let res =
             parse_document_indexes(include_str!("../assets/minor_gallery.html"), "gallery_id")
