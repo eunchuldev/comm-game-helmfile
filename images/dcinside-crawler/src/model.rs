@@ -1,9 +1,7 @@
 use crate::error::*;
 
-use std::{fmt::Display, str::FromStr};
-
-use chrono::{DateTime, Datelike, Duration, NaiveDateTime, TimeZone, Utc};
-use serde::{de, Deserialize, Deserializer, Serialize};
+use chrono::{DateTime, Datelike, NaiveDateTime, TimeZone, Utc};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use select::document::Document as HTMLDocument;
 use select::predicate::{Class, Name, Predicate};
@@ -261,8 +259,8 @@ impl From<FromComment> for Comment {
 
 pub fn parse_document_body(
     body: &str,
-    gallery_id: &str,
-    document_id: usize,
+    _gallery_id: &str,
+    _document_id: usize,
 ) -> Result<String, DocumentBodyParseError> {
     let doc = HTMLDocument::from(body);
     Ok(doc
@@ -291,7 +289,7 @@ pub fn parse_document_indexes(
         return Err(DocumentParseError::MinorGalleryPromoted);
     } else if let Some(node) = doc.select(Class("migall_state")).next() {
         if let Some(c) = node.attr("class") {
-            if c.find("restriction").is_some() {
+            if c.contains("restriction") {
                 return Err(DocumentParseError::MinorGalleryAccessNotAllowed);
             }
         }
@@ -595,11 +593,7 @@ mod tests {
         assert!(!res.is_empty());
         assert!(res.len() >= 20);
         assert!(res.iter().any(|d| d.comment_count > 0));
-        assert!(res.iter().any(|d| if DocumentKind::Picture == d.kind {
-            true
-        } else {
-            false
-        }));
+        assert!(res.iter().any(|d| DocumentKind::Picture == d.kind));
     }
     #[test]
     fn it_parses_minor_document_indexes() {
@@ -610,11 +604,7 @@ mod tests {
         assert!(!res.is_empty());
         assert!(res.len() >= 20);
         assert!(res.iter().any(|d| d.comment_count > 0));
-        assert!(res.iter().any(|d| if DocumentKind::Picture == d.kind {
-            true
-        } else {
-            false
-        }));
+        assert!(res.iter().any(|d| DocumentKind::Picture == d.kind));
     }
     #[test]
     fn it_parses_comments() {
@@ -638,7 +628,7 @@ mod tests {
     }
     #[test]
     fn it_deserializes_comments() {
-        let (res, max_page) = parse_comments(
+        let (res, _max_page) = parse_comments(
             include_str!("../assets/comments.json"),
             "gallery_id",
             1,
@@ -652,7 +642,7 @@ mod tests {
     }
     #[test]
     fn it_deserializes_minor_comments() {
-        let (res, max_page) = parse_comments(
+        let (res, _max_page) = parse_comments(
             include_str!("../assets/minor_comments.json"),
             "gallery_id",
             1,

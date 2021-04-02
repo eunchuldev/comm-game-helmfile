@@ -1,7 +1,6 @@
-use actix_web::{
-    error::ResponseError, get, http::StatusCode, post, web, App, HttpResponse, HttpServer,
-    Responder,
-};
+#![feature(never_type)]
+
+use actix_web::{get, http::StatusCode, web, App, HttpServer, Responder};
 use std::time::Duration;
 
 use dcinside_crawler::error::*;
@@ -81,19 +80,15 @@ impl State {
             crawler: Crawler::new(),
             live_directory_url: live_directory_url.to_string(),
             nats_subject,
-            nats_conn: nats::connect(nats_url).map_err(|e| WorkerError::NatsConnect(e))?,
+            nats_conn: nats::connect(nats_url).map_err(WorkerError::NatsConnect)?,
             data_broker_url: data_broker_url.to_string(),
             total,
             part,
             start_page: 2,
         })
     }
-    fn crawler_delay(mut self, v: u64) -> Self {
+    fn with_crawler_delay(mut self, v: u64) -> Self {
         self.crawler = self.crawler.delay(v);
-        self
-    }
-    fn start_page(mut self, v: usize) -> Self {
-        self.start_page = v;
         self
     }
     async fn fetch_gallery_list(&self) -> Result<Vec<GalleryState>, WorkerError> {
@@ -290,7 +285,7 @@ async fn crawl_forever(
     mut state: State,
     delay: Duration,
     gauges: ResultMetricGauges,
-) -> Result<(), WorkerError> {
+) -> Result<!, WorkerError> {
     loop {
         let metric = state.run().await?;
         gauges
@@ -314,7 +309,6 @@ async fn crawl_forever(
         info!("crawl done. wait {} milli seconds..", delay.as_millis());
         actix::clock::delay_for(delay).await;
     }
-    Ok(())
 }
 
 #[get("/health")]
@@ -330,13 +324,13 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 async fn main() -> std::io::Result<()> {
     pretty_env_logger::init();
 
-    let port = std::env::var("PORT").unwrap_or("8080".to_string());
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
 
     let live_directory_url = std::env::var("LIVE_DIRECTORY_URL").expect("LIVE_DIRECTORY_URL");
     let data_broker_url = std::env::var("DATA_BROKER_URL").expect("DATA_BROKER_URL");
     let nats_url = std::env::var("NATS_URL").expect("NATS_URL");
     let nats_subject =
-        std::env::var("NATS_SUBJECT").unwrap_or("crawled.dcinside.documents".to_string());
+        std::env::var("NATS_SUBJECT").unwrap_or_else(|_| "crawled.dcinside.documents".to_string());
 
     let part: u64 = std::env::var("PART").expect("PART").parse().expect("PART");
     let total: u64 = std::env::var("TOTAL")
@@ -344,11 +338,11 @@ async fn main() -> std::io::Result<()> {
         .parse()
         .expect("TOTAL");
     let delay: u64 = std::env::var("DELAY")
-        .unwrap_or("100".to_string())
+        .unwrap_or_else(|_| "100".to_string())
         .parse()
         .expect("DELAY");
     let sleep_duration: u64 = std::env::var("SLEEP_DURATION")
-        .unwrap_or("6000".to_string())
+        .unwrap_or_else(|_| "6000".to_string())
         .parse()
         .expect("SLEEP_DURATION");
 
@@ -387,7 +381,7 @@ async fn main() -> std::io::Result<()> {
                 part,
             )
             .unwrap()
-            .crawler_delay(delay);
+            .with_crawler_delay(delay);
             let res = crawl_forever(
                 state,
                 Duration::from_millis(sleep_duration),

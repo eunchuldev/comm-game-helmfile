@@ -14,8 +14,6 @@ use std::time::Duration;
 use select::document::Document as HTMLDocument;
 use select::predicate::Attr;
 
-use log::error;
-
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 struct CommentsPostForm<'a> {
@@ -256,30 +254,30 @@ impl<'a> Crawler {
                     match (comments, body) {
                         (Some(Ok(comms)), Some(Ok(body))) => Ok(Document {
                             gallery: gallery.clone().into(),
-                            index: index,
+                            index,
                             comments: Some(comms),
                             body: Some(body),
                         }),
                         (None, Some(Ok(body))) => Ok(Document {
                             gallery: gallery.clone().into(),
-                            index: index,
+                            index,
                             comments: None,
                             body: Some(body),
                         }),
                         (Some(Ok(comms)), None) => Ok(Document {
                             gallery: gallery.clone().into(),
-                            index: index,
+                            index,
                             comments: Some(comms),
                             body: None,
                         }),
                         (None, None) => Ok(Document {
                             gallery: gallery.clone().into(),
-                            index: index,
+                            index,
                             comments: None,
                             body: None,
                         }),
-                        (Some(Err(err)), _) => Err(err.into()),
-                        (_, Some(Err(err))) => Err(err.into()),
+                        (Some(Err(err)), _) => Err(err),
+                        (_, Some(Err(err))) => Err(err),
                     }
                 }
                 Err(err) => Err(err.into()),
@@ -336,30 +334,30 @@ impl<'a> Crawler {
                     match (comments, body) {
                         (Some(Ok(comms)), Some(Ok(body))) => Ok(Document {
                             gallery: gallery.clone().into(),
-                            index: index,
+                            index,
                             comments: Some(comms),
                             body: Some(body),
                         }),
                         (None, Some(Ok(body))) => Ok(Document {
                             gallery: gallery.clone().into(),
-                            index: index,
+                            index,
                             comments: None,
                             body: Some(body),
                         }),
                         (Some(Ok(comms)), None) => Ok(Document {
                             gallery: gallery.clone().into(),
-                            index: index,
+                            index,
                             comments: Some(comms),
                             body: None,
                         }),
                         (None, None) => Ok(Document {
                             gallery: gallery.clone().into(),
-                            index: index,
+                            index,
                             comments: None,
                             body: None,
                         }),
-                        (Some(Err(err)), _) => Err(err.into()),
-                        (_, Some(Err(err))) => Err(err.into()),
+                        (Some(Err(err)), _) => Err(err),
+                        (_, Some(Err(err))) => Err(err),
                     }
                 }
                 Err(err) => Err(err.into()),
@@ -544,12 +542,7 @@ mod tests {
             Err(_) => false,
         }));
         assert!(res.iter().any(|d| match d {
-            Ok(d) =>
-                if DocumentKind::Picture == d.kind {
-                    true
-                } else {
-                    false
-                },
+            Ok(d) => DocumentKind::Picture == d.kind,
             Err(_) => false,
         }));
     }
@@ -570,12 +563,7 @@ mod tests {
             Err(_) => false,
         }));
         assert!(res.iter().any(|d| match d {
-            Ok(d) =>
-                if DocumentKind::Picture == d.kind {
-                    true
-                } else {
-                    false
-                },
+            Ok(d) => DocumentKind::Picture == d.kind,
             Err(_) => false,
         }));
     }
@@ -590,7 +578,7 @@ mod tests {
         };
         let res = crawler.comments(&gallery, 1595404).await.unwrap();
         assert!(!res.is_empty());
-        assert!(res.len() >= 1);
+        assert!(!res.is_empty());
         assert!(!res.iter().any(|c| match &c.author {
             User::Static { id, .. } => id.is_empty(),
             User::Dynamic { ip, .. } => ip.is_empty(),

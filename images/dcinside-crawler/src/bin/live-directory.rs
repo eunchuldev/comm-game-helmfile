@@ -1,3 +1,5 @@
+#![feature(never_type)]
+
 use actix_web::{
     error::ResponseError, get, http::StatusCode, post, web, App, HttpResponse, HttpServer,
     Responder,
@@ -8,7 +10,6 @@ use std::time::Duration;
 use dcinside_crawler::error::*;
 use err_derive::Error;
 use std::convert::TryInto;
-use std::sync::Arc;
 
 use dcinside_crawler::crawler::Crawler;
 use dcinside_crawler::model::*;
@@ -117,7 +118,7 @@ impl State {
         for index in hot_galleries {
             let new_state = GalleryState {
                 index,
-                last_ranked: now.clone(),
+                last_ranked: now,
                 last_crawled_at: None,
                 last_published_at: None,
                 last_crawled_document_id: None,
@@ -140,7 +141,7 @@ impl State {
                                     );
                                     new_state.clone()
                                 });
-                            old_state.last_ranked = now.clone();
+                            old_state.last_ranked = now;
                             old_state.index = new_index;
                             old_state.visible = true;
                             old_state.last_published_at = None;
@@ -165,7 +166,7 @@ impl State {
                         None => {
                             let new_state = GalleryState {
                                 index: index.clone(),
-                                last_ranked: now.clone(),
+                                last_ranked: now,
                                 last_crawled_at: None,
                                 last_published_at: None,
                                 last_crawled_document_id: None,
@@ -196,17 +197,16 @@ impl State {
             .map(|(k, _)| k)
             .collect();
         for k in keys {
-            gallery_db.fetch_and_update(k, |old| match old {
-                Some(bytes) => Some(
+            gallery_db.fetch_and_update(k, |old| {
+                old.map(|bytes| {
                     serde_json::from_slice::<GalleryState>(bytes)
                         .map(|mut old_state| {
                             old_state.registered_at =
-                                Some(old_state.registered_at.unwrap_or(Utc::now()));
+                                Some(old_state.registered_at.unwrap_or_else(Utc::now));
                             serde_json::to_vec(&old_state).unwrap()
                         })
-                        .unwrap(),
-                ),
-                None => None,
+                        .unwrap()
+                })
             })?;
         }
         info!("db upgrade done");
@@ -218,9 +218,7 @@ impl State {
         crawled_document_count: usize,
         state: &GalleryState,
     ) -> f64 {
-        return (1.0
-            - self.publish_duration_estimate_weight1
-            - self.publish_duration_estimate_weight2)
+        (1.0 - self.publish_duration_estimate_weight1 - self.publish_duration_estimate_weight2)
             * state.publish_duration_in_seconds.unwrap_or(0.0)
             + match (
                 last_crawled_at,
@@ -236,9 +234,9 @@ impl State {
                                 / (crawled_document_count as f64))
                                 .min(3600.0 * 24.0)
                 }
-                (Some(n), _) => 0.0f64,
+                (Some(_n), _) => 0.0f64,
                 _ => 0.0f64,
-            };
+            }
     }
     fn report(&self, form: GalleryCrawlReportForm) -> Result<(), LiveDirectoryError> {
         let mut found = false;
@@ -260,7 +258,7 @@ impl State {
                                 "[{} gallery] too many crawled documents: `{}` documents crawled. last published at `{}`, publish duration: `{}` secs", 
                                 form.id,
                                 form.crawled_document_count,
-                                state.last_published_at.map(|t| t.to_string()).unwrap_or("None".to_string()),
+                                state.last_published_at.map(|t| t.to_string()).unwrap_or_else(|| "None".to_string()),
                                 state.publish_duration_in_seconds.unwrap_or(0.0),
                                 );
                     }
@@ -319,12 +317,11 @@ impl State {
                 form.worker_part.to_string().as_str(),
             ])
             .inc();
-        match form.error {
-            CrawlerErrorReport::Unknown => warn!(
+        if let CrawlerErrorReport::Unknown = form.error {
+            warn!(
                 "Unknown error reported from `{}` gallery at worker `{}`",
                 form.id, form.worker_part
-            ),
-            _ => {}
+            )
         };
         self.gallery_db
             .fetch_and_update(form.id.as_bytes(), |old| match old {
@@ -337,13 +334,13 @@ impl State {
                             old_state.publish_duration_in_seconds = Some(
                                 self.estimate_publish_duration(form.last_crawled_at, 0, &old_state),
                             );
-                            old_state.visible = match form.error {
+                            old_state.visible = !matches!(
+                                form.error,
                                 CrawlerErrorReport::PageNotFound
-                                | CrawlerErrorReport::MinorGalleryClosed
-                                | CrawlerErrorReport::MinorGalleryPromoted
-                                | CrawlerErrorReport::AdultPage => false,
-                                _ => true,
-                            };
+                                    | CrawlerErrorReport::MinorGalleryClosed
+                                    | CrawlerErrorReport::MinorGalleryPromoted
+                                    | CrawlerErrorReport::AdultPage
+                            );
                             serde_json::to_vec(&old_state).unwrap()
                         })
                         .ok()
@@ -400,7 +397,7 @@ impl State {
     }
 }
 
-async fn update_forever(state: State, delay: Duration) -> Result<(), LiveDirectoryError> {
+async fn update_forever(state: State, delay: Duration) -> Result<!, LiveDirectoryError> {
     info!("start update live directory");
     loop {
         state.update().await?;
@@ -410,7 +407,6 @@ async fn update_forever(state: State, delay: Duration) -> Result<(), LiveDirecto
         );
         actix::clock::delay_for(delay).await;
     }
-    Ok(())
 }
 
 #[get("/health")]
@@ -436,7 +432,7 @@ async fn report(
     web::Json(form): web::Json<GalleryCrawlReportForm>,
     state: web::Data<State>,
 ) -> Result<HttpResponse, LiveDirectoryError> {
-    let state = state.clone();
+    let state = state;
     state.report(form)?;
     Ok(HttpResponse::Ok().finish())
 }
@@ -446,7 +442,7 @@ async fn error_report(
     web::Json(form): web::Json<GalleryCrawlErrorReportForm>,
     state: web::Data<State>,
 ) -> Result<HttpResponse, LiveDirectoryError> {
-    let state = state.clone();
+    let state = state;
     state.error_report(form)?;
     Ok(HttpResponse::Ok().finish())
 }
@@ -506,29 +502,29 @@ impl Default for Metrics {
 async fn main() -> std::io::Result<()> {
     pretty_env_logger::init();
 
-    let port = std::env::var("PORT").unwrap_or("8080".to_string());
-    let store_path = std::env::var("STORE_PATH").unwrap_or("".to_string());
-    let total_worker_count: u64 = std::env::var("TOTAL_WORKER_COUNT")
-        .unwrap_or("30".to_string())
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let store_path = std::env::var("STORE_PATH").unwrap_or_else(|_| "".to_string());
+    let _total_worker_count: u64 = std::env::var("TOTAL_WORKER_COUNT")
+        .unwrap_or_else(|_| "30".to_string())
         .parse()
         .unwrap();
     let gallery_kind: GalleryKind = std::env::var("GALLERY_KIND")
-        .unwrap_or("major".to_string())
+        .unwrap_or_else(|_| "major".to_string())
         .into();
     let docs_per_crawl: usize = std::env::var("DOCS_PER_CRAWL")
-        .unwrap_or("10".to_string())
+        .unwrap_or_else(|_| "10".to_string())
         .parse()
         .unwrap();
     let min_wait_seconds: usize = std::env::var("MIN_WAIT_SECONDS")
-        .unwrap_or("10800".to_string())
+        .unwrap_or_else(|_| "10800".to_string())
         .parse()
         .unwrap();
     let pub_dur_estimate_weight1: f64 = std::env::var("PUB_DUR_ESTIMATE_WEIGHT1")
-        .unwrap_or("0.0999".to_string())
+        .unwrap_or_else(|_| "0.0999".to_string())
         .parse()
         .unwrap();
     let pub_dur_estimate_weight2: f64 = std::env::var("PUB_DUR_ESTIMATE_WEIGHT2")
-        .unwrap_or("0.0001".to_string())
+        .unwrap_or_else(|_| "0.0001".to_string())
         .parse()
         .unwrap();
 
@@ -651,8 +647,8 @@ mod tests {
         state.update().await.unwrap();
         let res1 = state.list_part(2, 0);
         let res2 = state.list_part(2, 1);
-        assert!(res1.len() > 0);
-        assert!(res2.len() > 0);
+        assert!(!res1.is_empty());
+        assert!(!res2.is_empty());
         let mut h = std::collections::HashSet::new();
         for t in res1.iter() {
             h.insert(t.index.id.clone());
@@ -672,8 +668,8 @@ mod tests {
         state.update().await.unwrap();
         let res1 = state.list_part(2, 0);
         let res2 = state.list_part(2, 1);
-        assert!(res1.len() > 0);
-        assert!(res2.len() > 0);
+        assert!(!res1.is_empty());
+        assert!(!res2.is_empty());
         let mut h = std::collections::HashSet::new();
         for t in res1.iter() {
             h.insert(t.index.id.clone());
@@ -699,7 +695,7 @@ mod tests {
             .report(GalleryCrawlReportForm {
                 worker_part: 1u64,
                 id: res1[0].index.id.clone(),
-                last_crawled_at: Some(now.clone()),
+                last_crawled_at: Some(now),
                 last_crawled_document_id: Some(1),
                 crawled_document_count: 1usize,
             })
@@ -727,7 +723,7 @@ mod tests {
             .error_report(GalleryCrawlErrorReportForm {
                 worker_part: 1u64,
                 id: res1[0].index.id.clone(),
-                last_crawled_at: Some(now.clone()),
+                last_crawled_at: Some(now),
                 error: CrawlerErrorReport::MinorGalleryClosed,
             })
             .unwrap();
