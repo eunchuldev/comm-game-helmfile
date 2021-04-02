@@ -61,9 +61,9 @@ pub struct DocumentIndex {
     pub title: String,
     pub subject: Option<String>,
     pub author: User,
-    pub comment_count: usize,
-    pub like_count: usize,
-    pub view_count: usize,
+    pub comment_count: u32,
+    pub like_count: u32,
+    pub view_count: u32,
     pub kind: DocumentKind,
     pub is_recommend: bool,
     pub created_at: DateTime<Utc>,
@@ -95,9 +95,9 @@ pub struct Document {
     pub title: String,
     pub subject: Option<String>,
     pub author: User,
-    pub comment_count: usize,
-    pub like_count: usize,
-    pub view_count: usize,
+    pub comment_count: u32,
+    pub like_count: u32,
+    pub view_count: u32,
     pub kind: DocumentKind,
     pub is_recommend: bool,
     pub created_at: DateTime<Utc>,
@@ -164,53 +164,6 @@ pub struct User {
     pub kind: UserKind,
 }
 
-/*
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(untagged)]
-pub enum User {
-    Static {
-        #[serde(rename(deserialize = "user_id"), deserialize_with = "skip_empty_str")]
-        id: String,
-        #[serde(rename(deserialize = "name"))]
-        nickname: String,
-        #[serde(skip_deserializing)]
-        ip: Option<bool>,
-    },
-    Dynamic {
-        #[serde(deserialize_with = "skip_empty_str")]
-        ip: String,
-        #[serde(rename(deserialize = "name"))]
-        nickname: String,
-        #[serde(skip_deserializing)]
-        id: Option<bool>,
-    },
-    Unknown {
-        #[serde(rename(deserialize = "name"))]
-        nickname: String,
-        #[serde(skip_deserializing)]
-        ip: Option<bool>,
-        #[serde(skip_deserializing)]
-        id: Option<bool>,
-    },
-}*/
-
-pub fn deserialize_string_or_int<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum StringOrInt {
-        String(String),
-        Int(i64),
-    }
-
-    match StringOrInt::deserialize(deserializer)? {
-        StringOrInt::String(s) => Ok(s),
-        StringOrInt::Int(i) => Ok(i.to_string()),
-    }
-}
-
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Clone)]
 pub struct GalleryIndex {
     pub id: String,
@@ -240,77 +193,6 @@ impl CommentKind {
     }
 }
 
-#[derive(Debug, Serialize, PartialEq, Clone)]
-#[serde(untagged)]
-pub enum CommentContents {
-    Text(String),
-    Con(String),
-    Voice(String),
-}
-
-impl<'de> Deserialize<'de> for CommentContents {
-    fn deserialize<D>(des: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(des)?;
-        Ok(if s.starts_with("<img") {
-            CommentContents::Con(s)
-        } else if s.starts_with("vr/") {
-            CommentContents::Voice(s)
-        } else {
-            CommentContents::Text(s)
-        })
-    }
-}
-
-pub fn comment_time<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    if s.is_empty() {
-        return Ok(None);
-    }
-    let created_at_without_tz = NaiveDateTime::parse_from_str(&s, "%Y.%m.%d %H:%M:%S")
-        .or_else(|_| {
-            NaiveDateTime::parse_from_str(
-                &format!(
-                    "{}.{}",
-                    Utc::now().with_timezone(&chrono_tz::Asia::Seoul).year(),
-                    s
-                ),
-                "%Y.%m.%d %H:%M:%S",
-            )
-        })
-        .map_err(serde::de::Error::custom)?;
-    Ok(Some(
-        chrono_tz::Asia::Seoul
-            .from_local_datetime(&created_at_without_tz)
-            .unwrap()
-            .with_timezone(&Utc),
-    ))
-}
-
-/*
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-pub struct FromComment {
-    #[serde(
-        rename(deserialize = "no"),
-        deserialize_with = "serde_aux::field_attributes::deserialize_number_from_string"
-    )]
-    pub id: usize,
-    #[serde(flatten)]
-    pub author: User,
-    pub depth: usize,
-    #[serde(rename(deserialize = "memo"))]
-    pub contents: String,
-    #[serde(rename(deserialize = "memo"))]
-    pub kind: CommentKind,
-    #[serde(rename(deserialize = "reg_date"), deserialize_with = "comment_time")]
-    pub created_at: Option<DateTime<Utc>>,
-}
-*/
 #[derive(Debug, Serialize, PartialEq)]
 pub struct Comment {
     pub id: usize,
@@ -321,19 +203,6 @@ pub struct Comment {
     pub parent_id: Option<usize>,
     pub created_at: Option<DateTime<Utc>>,
 }
-/*impl From<FromComment> for Comment {
-    fn from(f: FromComment) -> Comment {
-        Self {
-            id: f.id,
-            author: f.author,
-            depth: f.depth,
-            contents: f.contents,
-            kind: f.kind,
-            created_at: f.created_at,
-            parent_id: None,
-        }
-    }
-}*/
 
 impl<'de> Deserialize<'de> for Comment {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -358,18 +227,6 @@ impl<'de> Deserialize<'de> for Comment {
                 formatter.write_str("struct Comment")
             }
             
-                        
-            /*fn visit_seq<V>(self, mut seq: V) -> Result<Duration, V::Error>
-              where
-              V: SeqAccess<'de>,
-              {
-              let secs = seq.next_element()?
-              .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-              let nanos = seq.next_element()?
-              .ok_or_else(|| de::Error::invalid_length(1, &self))?;
-              Ok(Duration::new(secs, nanos))
-              }*/
-
             fn visit_map<V>(self, mut map: V) -> Result<Comment, V::Error>
                 where
                     V: MapAccess<'de>,
@@ -433,33 +290,6 @@ impl<'de> Deserialize<'de> for Comment {
                             ip: author_ip.and_then(|i| if i.is_empty() { None } else { Some(i) }),
                             id: author_id.and_then(|i| if i.is_empty() { None } else { Some(i) }),
                         },
-                        /*author: match (author_ip, author_id) {
-                            (Some(author_ip), None) if !author_ip.is_empty() => User::Dynamic {
-                                nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
-                                ip: author_ip,
-                                id: None,
-                            },
-                            (Some(author_ip), Some(author_id)) if !author_ip.is_empty() && author_id.is_empty()=> User::Dynamic {
-                                nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
-                                ip: author_ip,
-                                id: None,
-                            },
-                            (None, Some(author_id)) if !author_id.is_empty() => User::Static {
-                                nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
-                                ip: None,
-                                id: author_id,
-                            },
-                            (Some(author_ip), Some(author_id)) if author_ip.is_empty() && !author_id.is_empty()=> User::Static {
-                                nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
-                                ip: None,
-                                id: author_id,
-                            },
-                            _ => User::Unknown {
-                                nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
-                                ip: None,
-                                id: None,
-                            },
-                        },*/
                         depth: depth.ok_or_else(|| de::Error::missing_field("depth"))?,
                         contents: contents.ok_or_else(|| de::Error::missing_field("memo"))?,
                         kind: kind.ok_or_else(|| de::Error::missing_field("memo"))?,
@@ -564,32 +394,6 @@ pub fn parse_document_indexes(
                     id: id.and_then(|i| if i.is_empty() { None } else { Some(i.to_owned()) }),
                     ip: ip.and_then(|i| if i.is_empty() { None } else { Some(i.to_owned()) }),
                 }
-                /*match (id, ip) {
-                    (Some(id), None) => Ok(User::Static {
-                        id: id.into(),
-                        nickname: nickname.into(),
-                        ip: None,
-                    }),
-                    (Some(id), Some(ip)) if ip.is_empty() => Ok(User::Static {
-                        id: id.into(),
-                        nickname: nickname.into(),
-                        ip: None,
-                    }),
-                    (None, Some(ip)) => Ok(User::Dynamic {
-                        ip: ip.into(),
-                        nickname: nickname.into(),
-                        id: None,
-                    }),
-                    (Some(id), Some(ip)) if id.is_empty() => Ok(User::Dynamic {
-                        ip: ip.into(),
-                        nickname: nickname.into(),
-                        id: None,
-                    }),
-                    _ => Err(DocumentParseError::Select {
-                        path: ".us-post .gall_writer@(data-ip | data-id)",
-                        html: body.to_string(),
-                    }),
-                }?*/
             };
             let comment_count = node
                 .select(Class("reply_numbox"))
