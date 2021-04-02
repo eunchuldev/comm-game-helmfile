@@ -18,7 +18,7 @@ use serde::Deserialize;
 use actix_web_prom::PrometheusMetrics;
 use prometheus::{labels, opts, Histogram, HistogramOpts, IntCounterVec, IntGauge};
 
-use log::{error, warn, info};
+use log::{error, info, warn};
 
 #[derive(Error, Debug)]
 pub enum LiveDirectoryError {
@@ -74,7 +74,7 @@ impl State {
             gallery_kind,
             metrics,
             target_docs_count_per_crawl: 1,
-            min_wait_seconds_per_gallery: 3600*3,
+            min_wait_seconds_per_gallery: 3600 * 3,
             publish_duration_estimate_weight1: 0.0999,
             publish_duration_estimate_weight2: 0.0001,
         }
@@ -102,10 +102,9 @@ impl State {
             gallery_kind,
             metrics,
             target_docs_count_per_crawl: 1,
-            min_wait_seconds_per_gallery: 3600*3,
+            min_wait_seconds_per_gallery: 3600 * 3,
             publish_duration_estimate_weight1: 0.0999,
             publish_duration_estimate_weight2: 0.0001,
-
         }
     }
     async fn update(&self) -> Result<(), LiveDirectoryError> {
@@ -159,9 +158,8 @@ impl State {
             GalleryKind::Mini => panic!("mini gallery kind not supported yet"),
         };
         for index in weekly_hot_galleries {
-            self.gallery_db.fetch_and_update(
-                index.id.clone().as_bytes(),
-                move |old| {
+            self.gallery_db
+                .fetch_and_update(index.id.clone().as_bytes(), move |old| {
                     Some(match old {
                         Some(bytes) => bytes.to_vec(),
                         None => {
@@ -179,8 +177,7 @@ impl State {
                             serde_json::to_vec(&new_state).unwrap()
                         }
                     })
-                },
-            )?;
+                })?;
         }
         self.metrics
             .gallery_total
@@ -200,30 +197,48 @@ impl State {
             .collect();
         for k in keys {
             gallery_db.fetch_and_update(k, |old| match old {
-                Some(bytes) => {
-                    Some(serde_json::from_slice::<GalleryState>(bytes)
+                Some(bytes) => Some(
+                    serde_json::from_slice::<GalleryState>(bytes)
                         .map(|mut old_state| {
-                            old_state.registered_at = Some(old_state.registered_at.unwrap_or(Utc::now()));
+                            old_state.registered_at =
+                                Some(old_state.registered_at.unwrap_or(Utc::now()));
                             serde_json::to_vec(&old_state).unwrap()
-                        }).unwrap())
-                }
+                        })
+                        .unwrap(),
+                ),
                 None => None,
             })?;
         }
         info!("db upgrade done");
         Ok(())
     }
-    fn estimate_publish_duration(&self, last_crawled_at: Option<chrono::DateTime<Utc>>, crawled_document_count: usize, state: &GalleryState) -> f64 {
-        return (1.0 - self.publish_duration_estimate_weight1 - self.publish_duration_estimate_weight2) * state.publish_duration_in_seconds.unwrap_or(0.0) + 
-        match (last_crawled_at, state.last_published_at.or(state.registered_at)) {
-            (Some(n), Some(o)) => 
-                self.publish_duration_estimate_weight1 * ((n.signed_duration_since(o).num_seconds() as f64)
-                    / (crawled_document_count as f64)).min(3600.0) + 
-                self.publish_duration_estimate_weight2 * ((n.signed_duration_since(o).num_seconds() as f64)
-                    / (crawled_document_count as f64)).min(3600.0*24.0),
-            (Some(n), _) => 0.0f64,
-            _ => 0.0f64,
-        }
+    fn estimate_publish_duration(
+        &self,
+        last_crawled_at: Option<chrono::DateTime<Utc>>,
+        crawled_document_count: usize,
+        state: &GalleryState,
+    ) -> f64 {
+        return (1.0
+            - self.publish_duration_estimate_weight1
+            - self.publish_duration_estimate_weight2)
+            * state.publish_duration_in_seconds.unwrap_or(0.0)
+            + match (
+                last_crawled_at,
+                state.last_published_at.or(state.registered_at),
+            ) {
+                (Some(n), Some(o)) => {
+                    self.publish_duration_estimate_weight1
+                        * ((n.signed_duration_since(o).num_seconds() as f64)
+                            / (crawled_document_count as f64))
+                            .min(3600.0)
+                        + self.publish_duration_estimate_weight2
+                            * ((n.signed_duration_since(o).num_seconds() as f64)
+                                / (crawled_document_count as f64))
+                                .min(3600.0 * 24.0)
+                }
+                (Some(n), _) => 0.0f64,
+                _ => 0.0f64,
+            };
     }
     fn report(&self, form: GalleryCrawlReportForm) -> Result<(), LiveDirectoryError> {
         let mut found = false;
@@ -239,31 +254,29 @@ impl State {
             .observe(form.crawled_document_count as f64);
         if form.crawled_document_count >= 500 {
             match self.gallery_db.get(form.id.as_bytes()) {
-                Ok(Some(bytes)) => {
-                    match serde_json::from_slice::<GalleryState>(&bytes) {
-                        Ok(state) =>  {
-                            warn!(
+                Ok(Some(bytes)) => match serde_json::from_slice::<GalleryState>(&bytes) {
+                    Ok(state) => {
+                        warn!(
                                 "[{} gallery] too many crawled documents: `{}` documents crawled. last published at `{}`, publish duration: `{}` secs", 
                                 form.id,
-                                form.crawled_document_count, 
+                                form.crawled_document_count,
                                 state.last_published_at.map(|t| t.to_string()).unwrap_or("None".to_string()),
                                 state.publish_duration_in_seconds.unwrap_or(0.0),
                                 );
-                        }
-                        _ => {
-                            warn!(
+                    }
+                    _ => {
+                        warn!(
                                 "[{} gallery] too many crawled documents: `{}` documents crawled. Fail to parse saved state(It's wiered!)", 
                                 form.id,
-                                form.crawled_document_count, 
+                                form.crawled_document_count,
                                 );
-                        }
                     }
-                }
+                },
                 _ => {
                     warn!(
                         "[{} gallery] too many crawled documents: `{}` documents crawled. No saved states(It's wiered!)", 
                         form.id,
-                        form.crawled_document_count, 
+                        form.crawled_document_count,
                         );
                 }
             }
@@ -274,7 +287,12 @@ impl State {
                     found = true;
                     serde_json::from_slice::<GalleryState>(bytes)
                         .map(|mut old_state| {
-                            old_state.publish_duration_in_seconds = Some(self.estimate_publish_duration(form.last_crawled_at, form.crawled_document_count, &old_state));
+                            old_state.publish_duration_in_seconds =
+                                Some(self.estimate_publish_duration(
+                                    form.last_crawled_at,
+                                    form.crawled_document_count,
+                                    &old_state,
+                                ));
                             if form.crawled_document_count > 0 {
                                 old_state.last_published_at = form.last_crawled_at;
                             }
@@ -302,8 +320,10 @@ impl State {
             ])
             .inc();
         match form.error {
-            CrawlerErrorReport::Unknown => 
-                warn!("Unknown error reported from `{}` gallery at worker `{}`", form.id, form.worker_part),
+            CrawlerErrorReport::Unknown => warn!(
+                "Unknown error reported from `{}` gallery at worker `{}`",
+                form.id, form.worker_part
+            ),
             _ => {}
         };
         self.gallery_db
@@ -314,7 +334,9 @@ impl State {
                         .map(|mut old_state| {
                             old_state.last_error = Some(form.error.clone());
                             old_state.last_crawled_at = form.last_crawled_at;
-                            old_state.publish_duration_in_seconds = Some(self.estimate_publish_duration(form.last_crawled_at, 0, &old_state));
+                            old_state.publish_duration_in_seconds = Some(
+                                self.estimate_publish_duration(form.last_crawled_at, 0, &old_state),
+                            );
                             old_state.visible = match form.error {
                                 CrawlerErrorReport::PageNotFound
                                 | CrawlerErrorReport::MinorGalleryClosed
@@ -356,7 +378,8 @@ impl State {
                         Some(t) => {
                             let duration_from_last_publish =
                                 now.signed_duration_since(t).num_seconds() as f64;
-                            let wait_time = (v.publish_duration_in_seconds.unwrap_or(0.0) * self.target_docs_count_per_crawl as f64)
+                            let wait_time = (v.publish_duration_in_seconds.unwrap_or(0.0)
+                                * self.target_docs_count_per_crawl as f64)
                                 .min(self.min_wait_seconds_per_gallery as f64);
                             self.metrics.crawl_waittime_histogram.observe(wait_time);
                             if duration_from_last_publish >= wait_time {
@@ -368,7 +391,7 @@ impl State {
                         None => {
                             self.metrics.crawl_waittime_histogram.observe(0.0);
                             Some(v)
-                        },
+                        }
                     },
                     _ => None,
                 }
@@ -508,9 +531,6 @@ async fn main() -> std::io::Result<()> {
         .unwrap_or("0.0001".to_string())
         .parse()
         .unwrap();
-
-
-
 
     let prometheus = PrometheusMetrics::new(
         "dccrawler",

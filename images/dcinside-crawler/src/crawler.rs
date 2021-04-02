@@ -30,21 +30,6 @@ struct CommentsPostForm<'a> {
     _GALLTYPE_: &'a str,
 }
 
-/*async fn back_off<F, O, E>(delay: u64, max_delay: u64, f: impl Fn() -> F) -> Result<O, E>
-where F: futures::Future<Output = Result<O, E>>,
-{
-    let mut i = 0;
-    loop {
-        let res = f().await;
-        if res.is_ok() || i*delay >= max_delay {
-            break res;
-        }
-        println!("{} {}", "backoff..", i);
-        i += 1;
-        actix::clock::delay_for(Duration::from_millis(delay*i)).await;
-    }
-}*/
-
 macro_rules! back_off {
     ($delay:expr, $max_delay:expr, $($escape_rule:pat)|+, $($func:tt)+) => {
         {
@@ -270,21 +255,25 @@ impl<'a> Crawler {
                     let body: Option<Result<String, CrawlerError>> = None; //Some(self.document_body(&gallery, id).await);
                     match (comments, body) {
                         (Some(Ok(comms)), Some(Ok(body))) => Ok(Document {
+                            gallery: gallery.clone().into(),
                             index: index,
                             comments: Some(comms),
                             body: Some(body),
                         }),
                         (None, Some(Ok(body))) => Ok(Document {
+                            gallery: gallery.clone().into(),
                             index: index,
                             comments: None,
                             body: Some(body),
                         }),
                         (Some(Ok(comms)), None) => Ok(Document {
+                            gallery: gallery.clone().into(),
                             index: index,
                             comments: Some(comms),
                             body: None,
                         }),
                         (None, None) => Ok(Document {
+                            gallery: gallery.clone().into(),
                             index: index,
                             comments: None,
                             body: None,
@@ -346,21 +335,25 @@ impl<'a> Crawler {
                     let body: Option<Result<String, CrawlerError>> = None; //Some(self.document_body(&gallery, id).await);
                     match (comments, body) {
                         (Some(Ok(comms)), Some(Ok(body))) => Ok(Document {
+                            gallery: gallery.clone().into(),
                             index: index,
                             comments: Some(comms),
                             body: Some(body),
                         }),
                         (None, Some(Ok(body))) => Ok(Document {
+                            gallery: gallery.clone().into(),
                             index: index,
                             comments: None,
                             body: Some(body),
                         }),
                         (Some(Ok(comms)), None) => Ok(Document {
+                            gallery: gallery.clone().into(),
                             index: index,
                             comments: Some(comms),
                             body: None,
                         }),
                         (None, None) => Ok(Document {
+                            gallery: gallery.clone().into(),
                             index: index,
                             comments: None,
                             body: None,
@@ -456,13 +449,13 @@ impl<'a> Crawler {
         let (e_s_n_o, res) = back_off!(
             1000,
             1000 * 10,
-            CrawlerError::PageNotFound 
+            CrawlerError::PageNotFound
                 | CrawlerError::DocumentParseError(DocumentParseError::AdultPage)
                 | CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryClosed)
                 | CrawlerError::DocumentParseError(DocumentParseError::MinorGalleryPromoted)
                 | CrawlerError::DocumentParseError(
                     DocumentParseError::MinorGalleryAccessNotAllowed
-                    ),
+                ),
             || async {
                 let mut res = self
                     .client
@@ -473,10 +466,7 @@ impl<'a> Crawler {
                 if res.status() == StatusCode::NOT_FOUND {
                     return Err(CrawlerError::PageNotFound);
                 }
-                let bytes = res
-                    .body()
-                    .limit(1024 * 1024 * 8)
-                    .await?;
+                let bytes = res.body().limit(1024 * 1024 * 8).await?;
                 let text = std::str::from_utf8(&bytes)?;
                 let parsed = parse_document_indexes(text, &gallery.id)?;
                 let e_s_n_o = Some(

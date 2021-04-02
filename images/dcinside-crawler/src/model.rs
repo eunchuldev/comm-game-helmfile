@@ -3,7 +3,7 @@ use crate::error::*;
 use std::{fmt::Display, str::FromStr};
 
 use chrono::{DateTime, Datelike, Duration, NaiveDateTime, TimeZone, Utc};
-use serde::{Deserialize, Deserializer, Serialize, de};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 use select::document::Document as HTMLDocument;
 use select::predicate::{Class, Name, Predicate};
@@ -55,6 +55,7 @@ pub enum DocumentKind {
     Picture,
     Video,
 }
+
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct DocumentIndex {
     pub gallery_id: String,
@@ -71,7 +72,25 @@ pub struct DocumentIndex {
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub struct Gallery {
+    pub id: String,
+    pub name: String,
+    pub kind: GalleryKind,
+}
+
+impl From<GalleryIndex> for Gallery {
+    fn from(o: GalleryIndex) -> Self {
+        Self {
+            id: o.id,
+            name: o.name,
+            kind: o.kind,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct Document {
+    pub gallery: Gallery,
     #[serde(flatten)]
     pub index: DocumentIndex,
     pub comments: Option<Vec<Comment>>,
@@ -119,9 +138,9 @@ pub enum User {
     },
 }
 
-
 pub fn deserialize_string_or_int<'de, D>(deserializer: D) -> Result<String, D::Error>
-    where D: Deserializer<'de>
+where
+    D: Deserializer<'de>,
 {
     #[derive(Deserialize)]
     #[serde(untagged)]
@@ -143,7 +162,10 @@ pub struct GalleryIndex {
     pub name: String,
     #[serde(default)]
     pub kind: GalleryKind,
-    #[serde(default, deserialize_with = "serde_aux::field_attributes::deserialize_option_number_from_string")]
+    #[serde(
+        default,
+        deserialize_with = "serde_aux::field_attributes::deserialize_option_number_from_string"
+    )]
     pub rank: Option<usize>,
 }
 

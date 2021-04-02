@@ -1,0 +1,39 @@
+namespace Dcinside
+
+enum GalleryKind:byte { 
+  Major = 0, 
+  Minor = 1, 
+  Mini = 2 
+}
+
+enum DocumentKind:byte {
+  Text = 0,
+  Picture = 1,
+  Video = 2,
+}
+
+table Gallery {
+  id:string;
+  name:string;
+  kind:GalleryKind;
+}
+
+table User {
+  id:string;
+  ip:string;
+  nickname:string;
+}
+
+table Document {
+  gallery:Gallery;
+  id:long;
+  title:string;
+  subject:string;
+  author:User;
+  comment_count:short;
+  like_count:short;
+  view_count:short;
+  kind:DocumentKind;
+  is_recommend:bool;
+  created_at:long;
+}
