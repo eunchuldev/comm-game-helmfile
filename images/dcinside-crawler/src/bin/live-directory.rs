@@ -1,5 +1,3 @@
-#![feature(never_type)]
-
 use actix_web::{
     error::ResponseError, get, http::StatusCode, post, web, App, HttpResponse, HttpServer,
     Responder,
@@ -397,7 +395,7 @@ impl State {
     }
 }
 
-async fn update_forever(state: State, delay: Duration) -> Result<!, LiveDirectoryError> {
+async fn update_forever(state: State, delay: Duration) -> Result<std::convert::Infallible, LiveDirectoryError> {
     info!("start update live directory");
     loop {
         state.update().await?;

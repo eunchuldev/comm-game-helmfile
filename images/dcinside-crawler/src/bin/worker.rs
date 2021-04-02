@@ -1,5 +1,3 @@
-#![feature(never_type)]
-
 use actix_web::{get, http::StatusCode, web, App, HttpServer, Responder};
 use std::time::Duration;
 
@@ -196,8 +194,8 @@ impl State {
                             Ok(doc) => {
                                 metric.document_success += 1;
                                 metric.comment_success += 1;
-                                if last_document_id < doc.index.id {
-                                    last_document_id = doc.index.id;
+                                if last_document_id < doc.id {
+                                    last_document_id = doc.id;
                                 }
                                 if let Err(e) = self.send_data(doc).await {
                                     error!("error while send data: {}", e.to_string());
@@ -285,7 +283,7 @@ async fn crawl_forever(
     mut state: State,
     delay: Duration,
     gauges: ResultMetricGauges,
-) -> Result<!, WorkerError> {
+) -> Result<std::convert::Infallible, WorkerError> {
     loop {
         let metric = state.run().await?;
         gauges
@@ -402,6 +400,52 @@ async fn main() -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    fn s() -> String {
+        "a".to_string()
+    }
+    #[test]
+    fn bincode_serialize() {
+        let doc = Document {
+            gallery: Gallery {
+                id: s(),
+                name: s(),
+                kind: GalleryKind::Major,
+            },
+            gallery_id: s(),
+            id: 1,
+            title: s(),
+            subject: Some(s()),
+            author: User::Dynamic {
+                ip: s(),
+                nickname: s(),
+                id: None,
+            },
+            comment_count: 1,
+            like_count: 2,
+            view_count: 3,
+            kind: DocumentKind::Text,
+            is_recommend: true,
+            created_at: chrono::Utc::now(),
+
+            comments: Some(vec![
+                Comment {
+                    id: 1,
+                    author: User::Static {
+                        ip: None,
+                        nickname: s(),
+                        id: s(),
+                    },
+                    depth: 0,
+                    kind: CommentKind::Text,
+                    contents: s(),
+                    parent_id: None,
+                    created_at: Some(chrono::Utc::now()),
+                }]),
+            body: None
+        };
+        let bytes = bincode::serialize(&doc).unwrap();
+    }
 
     /*
     #[actix_rt::test]

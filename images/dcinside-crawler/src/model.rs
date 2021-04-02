@@ -1,7 +1,7 @@
 use crate::error::*;
 
 use chrono::{DateTime, Datelike, NaiveDateTime, TimeZone, Utc};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de::{MapAccess, Visitor, self, IgnoredAny}};
 
 use select::document::Document as HTMLDocument;
 use select::predicate::{Class, Name, Predicate};
@@ -86,13 +86,47 @@ impl From<GalleryIndex> for Gallery {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Document {
     pub gallery: Gallery,
-    #[serde(flatten)]
-    pub index: DocumentIndex,
+    
+    pub gallery_id: String,
+    pub id: usize,
+    pub title: String,
+    pub subject: Option<String>,
+    pub author: User,
+    pub comment_count: usize,
+    pub like_count: usize,
+    pub view_count: usize,
+    pub kind: DocumentKind,
+    pub is_recommend: bool,
+    pub created_at: DateTime<Utc>,
+
     pub comments: Option<Vec<Comment>>,
     pub body: Option<String>,
+}
+
+impl Document {
+    pub fn from_indexes(gallery_index: GalleryIndex, doc_index: DocumentIndex, comments: Option<Vec<Comment>>, body: Option<String>) -> Self {
+        Self{
+            gallery: gallery_index.into(),
+
+            gallery_id: doc_index.gallery_id,
+            id: doc_index.id,
+            title: doc_index.title,
+            subject: doc_index.subject,
+            author: doc_index.author,
+            comment_count: doc_index.comment_count,
+            like_count: doc_index.like_count,
+            view_count: doc_index.view_count,
+            kind: doc_index.kind,
+            is_recommend: doc_index.is_recommend,
+            created_at: doc_index.created_at,
+
+            comments,
+            body
+        }
+    }
 }
 
 pub fn skip_empty_str<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -168,6 +202,21 @@ pub struct GalleryIndex {
 }
 
 #[derive(Debug, Serialize, PartialEq, Clone)]
+pub enum CommentKind { Text, Con, Voice }
+
+impl CommentKind {
+    fn from_contents(contents: &str) -> Self {
+        if contents.starts_with("<img") {
+            Self::Con
+        } else if contents.starts_with("vr/") {
+            Self::Voice
+        } else {
+            Self::Text
+        }
+    }
+}
+
+#[derive(Debug, Serialize, PartialEq, Clone)]
 #[serde(untagged)]
 pub enum CommentContents {
     Text(String),
@@ -219,6 +268,7 @@ where
     ))
 }
 
+/*
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct FromComment {
     #[serde(
@@ -230,32 +280,169 @@ pub struct FromComment {
     pub author: User,
     pub depth: usize,
     #[serde(rename(deserialize = "memo"))]
-    pub contents: CommentContents,
+    pub contents: String,
+    #[serde(rename(deserialize = "memo"))]
+    pub kind: CommentKind,
     #[serde(rename(deserialize = "reg_date"), deserialize_with = "comment_time")]
     pub created_at: Option<DateTime<Utc>>,
 }
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(from = "FromComment")]
+*/
+#[derive(Debug, Serialize, PartialEq)]
 pub struct Comment {
     pub id: usize,
     pub author: User,
     pub depth: usize,
-    pub contents: CommentContents,
+    pub contents: String,
+    pub kind: CommentKind,
     pub parent_id: Option<usize>,
     pub created_at: Option<DateTime<Utc>>,
 }
-impl From<FromComment> for Comment {
+/*impl From<FromComment> for Comment {
     fn from(f: FromComment) -> Comment {
         Self {
             id: f.id,
             author: f.author,
             depth: f.depth,
             contents: f.contents,
+            kind: f.kind,
             created_at: f.created_at,
             parent_id: None,
         }
     }
+}*/
+
+impl<'de> Deserialize<'de> for Comment {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum StringOrInt {
+            String(String),
+            Number(usize),
+        }
+
+        
+        struct CommentVisitor;
+
+        impl<'de> Visitor<'de> for CommentVisitor {
+            type Value = Comment;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct Comment")
+            }
+            
+                        
+            /*fn visit_seq<V>(self, mut seq: V) -> Result<Duration, V::Error>
+              where
+              V: SeqAccess<'de>,
+              {
+              let secs = seq.next_element()?
+              .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+              let nanos = seq.next_element()?
+              .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+              Ok(Duration::new(secs, nanos))
+              }*/
+
+            fn visit_map<V>(self, mut map: V) -> Result<Comment, V::Error>
+                where
+                    V: MapAccess<'de>,
+                {
+                    let mut id: Option<StringOrInt> = None;
+                    let mut author_id: Option<String> = None;
+                    let mut author_ip: Option<String> = None;
+                    let mut author_nickname = None;
+                    let mut depth = None;
+                    let mut contents = None;
+                    let mut kind = None;
+                    let mut created_at = None;
+                    while let Some(key) = map.next_key()? {
+                        match key {
+                            "no" => { id = Some(map.next_value()?); }
+                            "user_id" => { author_id = Some(map.next_value()?); }
+                            "ip" => { author_ip = Some(map.next_value()?); }
+                            "name" => { author_nickname = Some(map.next_value()?); }
+                            "depth" => { depth = Some(map.next_value()?); }
+                            "memo" => {
+                                let val = map.next_value::<String>()?;
+                                kind = Some(CommentKind::from_contents(&val));
+                                contents = Some(val);
+                            }
+                            "reg_date" => {
+                                created_at = Some(map.next_value::<String>()?);
+                            }
+                            "comment_date" => {
+                                created_at = Some(map.next_value::<String>()?);
+                            }
+                            _ => { map.next_value::<IgnoredAny>()?; }
+                        }
+                    }
+                    let created_at = created_at.and_then(|s| {
+                        NaiveDateTime::parse_from_str(&s, "%Y.%m.%d %H:%M:%S")
+                            .or_else(|_| {
+                                NaiveDateTime::parse_from_str(
+                                    &format!(
+                                        "{}.{}",
+                                        Utc::now().with_timezone(&chrono_tz::Asia::Seoul).year(),
+                                        s
+                                    ),
+                                    "%Y.%m.%d %H:%M:%S",
+                                )
+                            })
+                            .map(|created_at_without_tz|
+                                chrono_tz::Asia::Seoul
+                                    .from_local_datetime(&created_at_without_tz)
+                                    .unwrap()
+                                    .with_timezone(&Utc))
+                            .ok()
+                        });
+                    Ok(Comment {
+                        id: match id.ok_or_else(|| de::Error::missing_field("no"))? {
+                            StringOrInt::String(s) => s.parse().map_err(|_| de::Error::custom("field `no` should number_string"))?,
+                            StringOrInt::Number(u) => u,
+                        },
+                        author: match (author_ip, author_id) {
+                            (Some(author_ip), None) if !author_ip.is_empty() => User::Dynamic {
+                                nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
+                                ip: author_ip,
+                                id: None,
+                            },
+                            (Some(author_ip), Some(author_id)) if !author_ip.is_empty() && author_id.is_empty()=> User::Dynamic {
+                                nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
+                                ip: author_ip,
+                                id: None,
+                            },
+                            (None, Some(author_id)) if !author_id.is_empty() => User::Static {
+                                nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
+                                ip: None,
+                                id: author_id,
+                            },
+                            (Some(author_ip), Some(author_id)) if author_ip.is_empty() && !author_id.is_empty()=> User::Static {
+                                nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
+                                ip: None,
+                                id: author_id,
+                            },
+                            _ => User::Unknown {
+                                nickname: author_nickname.ok_or_else(|| de::Error::missing_field("name"))?,
+                                ip: None,
+                                id: None,
+                            },
+                        },
+                        depth: depth.ok_or_else(|| de::Error::missing_field("depth"))?,
+                        contents: contents.ok_or_else(|| de::Error::missing_field("memo"))?,
+                        kind: kind.ok_or_else(|| de::Error::missing_field("memo"))?,
+                        created_at,
+                        parent_id: None,
+                    })
+                }
+        }
+        const FIELDS: &[&str] = &["id", "author", "depth", "contents", "kind", "created_at", "parent_id"];
+        deserializer.deserialize_struct("Comment", FIELDS, CommentVisitor)
+    }
 }
+
 
 pub fn parse_document_body(
     body: &str,
@@ -488,7 +675,7 @@ pub fn parse_comments(
                     0usize
                 };
                 for c in comments.iter_mut() {
-                    if c.depth == 0 {
+                    if c.depth == 0 && c.id > 0{
                         last_root_comment_id = c.id;
                     } else if last_root_comment_id > 0 {
                         c.parent_id = Some(last_root_comment_id);
@@ -636,7 +823,7 @@ mod tests {
         )
         .unwrap();
         let res = serde_json::to_string(&res[0]).unwrap();
-        let expected = "{\"id\":13369033,\"author\":{\"ip\":\"119.195\",\"nickname\":\"ㅇㅇ\",\"id\":null},\"depth\":0,\"contents\":\"이제 뻑가,이슈왕 같은 랙카들이 청원하라고 한번 더 할듯ㅋㅋ  - dc App\",\"parent_id\":null,\"created_at\":\"2021-01-10T08:20:43Z\"}".to_string();
+        let expected = "{\"id\":13369033,\"author\":{\"ip\":\"119.195\",\"nickname\":\"ㅇㅇ\",\"id\":null},\"depth\":0,\"contents\":\"이제 뻑가,이슈왕 같은 랙카들이 청원하라고 한번 더 할듯ㅋㅋ  - dc App\",\"kind\":\"Text\",\"parent_id\":null,\"created_at\":\"2021-01-10T08:20:43Z\"}".to_string();
         assert_eq!(expected, res);
         //assert_eq!(!res[0], Comment{});
     }
@@ -650,7 +837,7 @@ mod tests {
         )
         .unwrap();
         let res = serde_json::to_string(&res[0]).unwrap();
-        let expected = "{\"id\":4649463,\"author\":{\"id\":\"nasdaqtrader\",\"nickname\":\"오함마의현인.\",\"ip\":null},\"depth\":0,\"contents\":\"개추\",\"parent_id\":null,\"created_at\":\"2020-12-31T07:44:47Z\"}".to_string();
+        let expected = "{\"id\":4649463,\"author\":{\"id\":\"nasdaqtrader\",\"nickname\":\"오함마의현인.\",\"ip\":null},\"depth\":0,\"contents\":\"개추\",\"kind\":\"Text\",\"parent_id\":null,\"created_at\":\"2020-12-31T07:44:47Z\"}".to_string();
         assert_eq!(expected, res);
         //assert_eq!(!res[0], Comment{});
     }

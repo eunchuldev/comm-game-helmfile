@@ -252,30 +252,10 @@ impl<'a> Crawler {
                     // HACKIT: block by dcinside
                     let body: Option<Result<String, CrawlerError>> = None; //Some(self.document_body(&gallery, id).await);
                     match (comments, body) {
-                        (Some(Ok(comms)), Some(Ok(body))) => Ok(Document {
-                            gallery: gallery.clone().into(),
-                            index,
-                            comments: Some(comms),
-                            body: Some(body),
-                        }),
-                        (None, Some(Ok(body))) => Ok(Document {
-                            gallery: gallery.clone().into(),
-                            index,
-                            comments: None,
-                            body: Some(body),
-                        }),
-                        (Some(Ok(comms)), None) => Ok(Document {
-                            gallery: gallery.clone().into(),
-                            index,
-                            comments: Some(comms),
-                            body: None,
-                        }),
-                        (None, None) => Ok(Document {
-                            gallery: gallery.clone().into(),
-                            index,
-                            comments: None,
-                            body: None,
-                        }),
+                        (Some(Ok(comms)), Some(Ok(body))) => Ok(Document::from_indexes(gallery.clone(), index, Some(comms), Some(body))),
+                        (None, Some(Ok(body))) => Ok(Document::from_indexes(gallery.clone(), index, None, Some(body))),
+                        (Some(Ok(comms)), None) => Ok(Document::from_indexes(gallery.clone(), index, Some(comms), None)),
+                        (None, None) => Ok(Document::from_indexes(gallery.clone(), index, None, None)),
                         (Some(Err(err)), _) => Err(err),
                         (_, Some(Err(err))) => Err(err),
                     }
@@ -332,30 +312,10 @@ impl<'a> Crawler {
                     // HACKIT: block by dcinside
                     let body: Option<Result<String, CrawlerError>> = None; //Some(self.document_body(&gallery, id).await);
                     match (comments, body) {
-                        (Some(Ok(comms)), Some(Ok(body))) => Ok(Document {
-                            gallery: gallery.clone().into(),
-                            index,
-                            comments: Some(comms),
-                            body: Some(body),
-                        }),
-                        (None, Some(Ok(body))) => Ok(Document {
-                            gallery: gallery.clone().into(),
-                            index,
-                            comments: None,
-                            body: Some(body),
-                        }),
-                        (Some(Ok(comms)), None) => Ok(Document {
-                            gallery: gallery.clone().into(),
-                            index,
-                            comments: Some(comms),
-                            body: None,
-                        }),
-                        (None, None) => Ok(Document {
-                            gallery: gallery.clone().into(),
-                            index,
-                            comments: None,
-                            body: None,
-                        }),
+                        (Some(Ok(comms)), Some(Ok(body))) => Ok(Document::from_indexes(gallery.clone(), index, Some(comms), Some(body))),
+                        (None, Some(Ok(body))) => Ok(Document::from_indexes(gallery.clone(), index, None, Some(body))),
+                        (Some(Ok(comms)), None) => Ok(Document::from_indexes(gallery.clone(), index, Some(comms), None)),
+                        (None, None) => Ok(Document::from_indexes(gallery.clone(), index, None, None)),
                         (Some(Err(err)), _) => Err(err),
                         (_, Some(Err(err))) => Err(err),
                     }
