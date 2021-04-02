@@ -472,6 +472,12 @@ pub fn parse_document_indexes(
         return Err(DocumentParseError::AdultPage);
     } else if body.starts_with("<script type=\"text/javascript\">alert(\"해당 마이너 갤러리는 매니저의 요청으로 폐쇄되었습니다.") {
         return Err(DocumentParseError::MinorGalleryClosed);
+    } else if body.starts_with("<script type=\"text/javascript\">alert(\"해당 마이너 갤러리는 운영원칙 위반") {
+        if body.contains("폐쇄") {
+            return Err(DocumentParseError::MinorGalleryClosed);
+        } else {
+            return Err(DocumentParseError::MinorGalleryAccessNotAllowed);
+        }
     } else if body.starts_with("<script type=\"text/javascript\">location.replace(\"https://gall.dcinside.com/board/lists?") {
         return Err(DocumentParseError::MinorGalleryPromoted);
     } else if let Some(node) = doc.select(Class("migall_state")).next() {
@@ -879,4 +885,14 @@ mod tests {
         );
         assert_err!(res, Err(DocumentParseError::MinorGalleryClosed));
     }
+
+    #[test]
+    fn it_pareses_closed2() {
+        let res = parse_document_indexes(
+            r#"<script type="text/javascript">alert("해당 마이너 갤러리는 운영원칙 위반(사유: )으로 폐쇄되었습니다.\n마이너 갤러리 메인으로 돌아갑니다.");</script><script type="text/javascript">location.replace("https://gall.dcinside.com/m");</script>"#,
+            "gallery_id",
+        );
+        assert_err!(res, Err(DocumentParseError::MinorGalleryClosed));
+    }
+
 }
