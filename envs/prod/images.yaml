@@ -1,5 +1,5 @@
 images:
-  dcinside-crawler: gcr.io/comm-game/dcinside-crawler:befb742
+  dcinside-crawler: gcr.io/comm-game/dcinside-crawler:2fa0e0b
   spark: gcr.io/comm-game/spark:a8b6be3
   jupyter-singleuser: gcr.io/comm-game/jupyter-singleuser:77ffeff
   gcloud-kubectl: gcr.io/community-gamification-301712/gcloud-kubectl:05fecaf

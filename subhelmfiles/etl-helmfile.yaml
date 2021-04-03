@@ -45,6 +45,7 @@ releases:
 {{ toYaml .Values.affinities.alwaysOn | indent 6 }}
 - name: nsq
   chart: ../charts/nsq
+  installed: false
   values:
   - nsqd:
       name: nsqd
@@ -99,17 +100,6 @@ releases:
         requests:
           memory: "50Mi"
           cpu: "50m"
-      extraConfigs: |
-        [sinks.dc_doc_search_server]
-        type = "http"
-        inputs = [ "dc_doc" ]
-        uri = "http://tantivy-rest-dcinside-docs-0.tantivy-rest-dcinside-docs:8000/docs"
-
-        encoding.codec = "ndjson"
-        encoding.except_fields = ["comments"]
-
-        healthcheck.enabled = true 
-        healthcheck.uri = "http://tantivy-rest-dcinside-docs-0.tantivy-rest-dcinside-docs:8000/healthz"
     worker:
       labels: 
         app.kubernetes.io/name: dc-crawler-worker
@@ -149,17 +139,6 @@ releases:
         requests:
           memory: "50Mi"
           cpu: "50m"
-      extraConfigs: |
-        [sinks.dc_doc_search_server]
-        type = "http"
-        inputs = [ "dc_doc" ]
-        uri = "http://tantivy-rest-dcinside-docs-0.tantivy-rest-dcinside-docs:8000/docs"
-
-        encoding.codec = "ndjson"
-        encoding.except_fields = ["comments"]
-
-        healthcheck.enabled = true 
-        healthcheck.uri = "http://tantivy-rest-dcinside-docs-0.tantivy-rest-dcinside-docs:8000/healthz"
     worker:
       labels: 
         app.kubernetes.io/name: dc-crawler-worker

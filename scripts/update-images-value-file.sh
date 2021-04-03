@@ -24,9 +24,27 @@ for dir in "$ROOT"/images/*
 do
   dir="${dir%*/}"
   name="${dir##*/}"
+  prefix="$(echo "$name" | grep -o '^[0-9]*')"
   name="$(echo "$name" | sed 's/^[0-9_\-]*//g')"
-  DOCKER_BUILDKIT=1 docker build -t "$name" "$dir"
+
   if [ "$IMAGE" == "$name" ]; then 
+    target_prefix="$prefix"
+    break
+  fi
+done
+
+for dir in "$ROOT"/images/*
+do
+  dir="${dir%*/}"
+  name="${dir##*/}"
+  prefix="$(echo "$name" | grep -o '^[0-9]*')"
+  name="$(echo "$name" | sed 's/^[0-9_\-]*//g')"
+
+  if [ -n "$target_prefix" ] && [ "$prefix" == "$target_prefix" ]; then
+    DOCKER_BUILDKIT=1 docker build -t "$name" "$dir"
+  fi
+  if [ "$IMAGE" == "$name" ]; then 
+    DOCKER_BUILDKIT=1 docker build -t "$name" "$dir"
     break
   fi
 done
