@@ -1,0 +1,35 @@
+[package]
+name = "dcgle-server"
+version = "0.1.0"
+authors = ["Eunchul Song <eunchulsong9@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+tokio = { version = "1", features = [ "rt", "macros" ] }
+
+warp = "0.3"
+async-graphql = "2.6"
+async-graphql-warp = "2.6"
+http = "0.2"
+
+# serde_json = "1"
+# serde = { version = "1", features = ["derive"] }
+
+clap = "3.0.0-beta.2"
+pretty_env_logger = "0.4"
+log = "0.4"
+futures = "0.3"
+
+prometheus = "0.11"
+thiserror = "1"
+lazy_static = "*"
+
+dcgle-model = { path = "../dcgle-model" }
+
+[dev-dependencies]
+serial_test = "0.5"
+sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "postgres", "sqlite", "migrate", "chrono" ] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[build-dependencies]
+dcgle-model = { path = "../dcgle-model" }
