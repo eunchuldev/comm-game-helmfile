@@ -11,6 +11,8 @@ use std::convert::TryInto;
 
 use dcinside_crawler::crawler::Crawler;
 use dcinside_crawler::model::*;
+use dcinside_crawler::parse::*;
+use dcinside_model::*;
 
 use serde::Deserialize;
 
@@ -241,7 +243,11 @@ impl State {
         self.metrics
             .worker_report_success_total
             .with_label_values(&[
-                self.gallery_kind.into(),
+                match self.gallery_kind {
+                    GalleryKind::Major => "major",
+                    GalleryKind::Minor => "minor",
+                    GalleryKind::Mini => "mini",
+                },
                 form.worker_part.to_string().as_str(),
             ])
             .inc();
@@ -311,7 +317,11 @@ impl State {
         self.metrics
             .worker_report_error_total
             .with_label_values(&[
-                self.gallery_kind.into(),
+                match self.gallery_kind {
+                    GalleryKind::Major => "major",
+                    GalleryKind::Minor => "minor",
+                    GalleryKind::Mini => "mini",
+                },
                 form.worker_part.to_string().as_str(),
             ])
             .inc();
@@ -395,7 +405,10 @@ impl State {
     }
 }
 
-async fn update_forever(state: State, delay: Duration) -> Result<std::convert::Infallible, LiveDirectoryError> {
+async fn update_forever(
+    state: State,
+    delay: Duration,
+) -> Result<std::convert::Infallible, LiveDirectoryError> {
     info!("start update live directory");
     loop {
         state.update().await?;
@@ -506,9 +519,8 @@ async fn main() -> std::io::Result<()> {
         .unwrap_or_else(|_| "30".to_string())
         .parse()
         .unwrap();
-    let gallery_kind: GalleryKind = std::env::var("GALLERY_KIND")
-        .unwrap_or_else(|_| "major".to_string())
-        .into();
+    let gallery_kind: GalleryKind =
+        gallerykind_from_str(std::env::var("GALLERY_KIND").unwrap_or_else(|_| "major".to_string()));
     let docs_per_crawl: usize = std::env::var("DOCS_PER_CRAWL")
         .unwrap_or_else(|_| "10".to_string())
         .parse()
@@ -529,13 +541,22 @@ async fn main() -> std::io::Result<()> {
     let prometheus = PrometheusMetrics::new(
         "dccrawler",
         Some("/metrics"),
-        Some(labels! { "gallery_kind".to_string() => <&str>::from(gallery_kind).to_string() }),
+        Some(labels! { "gallery_kind".to_string() => match gallery_kind {
+                GalleryKind::Major => "major",
+                GalleryKind::Minor => "minor",
+                GalleryKind::Mini => "mini"
+            }.to_string()
+        }),
     );
     let metrics = Metrics {
         gallery_total: IntGauge::with_opts(opts!(
             "dccrawler_gallery_total",
             "dccrawler_gallery_total",
-            labels! { "gallery_kind" => <&str>::from(gallery_kind) }
+            labels! { "gallery_kind" => match gallery_kind {
+                GalleryKind::Major => "major",
+                GalleryKind::Minor => "minor",
+                GalleryKind::Mini => "mini"
+            } }
         ))
         .unwrap(),
         worker_report_success_total: IntCounterVec::new(
@@ -559,7 +580,14 @@ async fn main() -> std::io::Result<()> {
                 "dccrawler_crawl_waittime_histogram",
                 "dccrawler_crawl_waittime_histogram",
             )
-            .const_label("gallery_kind", <&str>::from(gallery_kind))
+            .const_label(
+                "gallery_kind",
+                match gallery_kind {
+                    GalleryKind::Major => "major",
+                    GalleryKind::Minor => "minor",
+                    GalleryKind::Mini => "mini",
+                },
+            )
             .buckets(vec![
                 60.0,
                 300.0,
@@ -575,7 +603,14 @@ async fn main() -> std::io::Result<()> {
                 "dccrawler_crawled_document_count_histogram",
                 "dccrawler_crawled_document_count_histogram",
             )
-            .const_label("gallery_kind", <&str>::from(gallery_kind))
+            .const_label(
+                "gallery_kind",
+                match gallery_kind {
+                    GalleryKind::Major => "major",
+                    GalleryKind::Minor => "minor",
+                    GalleryKind::Mini => "mini",
+                },
+            )
             .buckets(vec![0.0, 5.0, 10.0, 30.0, 100.0, 500.0, 1000.0, 10000.0]),
         )
         .unwrap(),

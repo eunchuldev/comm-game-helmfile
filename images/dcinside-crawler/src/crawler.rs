@@ -1,5 +1,6 @@
 use crate::error::*;
-use crate::model::*;
+use crate::parse::*;
+use dcinside_model::*;
 
 use actix_web::{
     client::{Client, ClientBuilder},
@@ -252,10 +253,27 @@ impl<'a> Crawler {
                     // HACKIT: block by dcinside
                     let body: Option<Result<String, CrawlerError>> = None; //Some(self.document_body(&gallery, id).await);
                     match (comments, body) {
-                        (Some(Ok(comms)), Some(Ok(body))) => Ok(Document::from_indexes(gallery.clone(), index, Some(comms), Some(body))),
-                        (None, Some(Ok(body))) => Ok(Document::from_indexes(gallery.clone(), index, None, Some(body))),
-                        (Some(Ok(comms)), None) => Ok(Document::from_indexes(gallery.clone(), index, Some(comms), None)),
-                        (None, None) => Ok(Document::from_indexes(gallery.clone(), index, None, None)),
+                        (Some(Ok(comms)), Some(Ok(body))) => Ok(document_from_indexes(
+                            gallery.clone(),
+                            index,
+                            Some(comms),
+                            Some(body),
+                        )),
+                        (None, Some(Ok(body))) => Ok(document_from_indexes(
+                            gallery.clone(),
+                            index,
+                            None,
+                            Some(body),
+                        )),
+                        (Some(Ok(comms)), None) => Ok(document_from_indexes(
+                            gallery.clone(),
+                            index,
+                            Some(comms),
+                            None,
+                        )),
+                        (None, None) => {
+                            Ok(document_from_indexes(gallery.clone(), index, None, None))
+                        }
                         (Some(Err(err)), _) => Err(err),
                         (_, Some(Err(err))) => Err(err),
                     }
@@ -312,10 +330,27 @@ impl<'a> Crawler {
                     // HACKIT: block by dcinside
                     let body: Option<Result<String, CrawlerError>> = None; //Some(self.document_body(&gallery, id).await);
                     match (comments, body) {
-                        (Some(Ok(comms)), Some(Ok(body))) => Ok(Document::from_indexes(gallery.clone(), index, Some(comms), Some(body))),
-                        (None, Some(Ok(body))) => Ok(Document::from_indexes(gallery.clone(), index, None, Some(body))),
-                        (Some(Ok(comms)), None) => Ok(Document::from_indexes(gallery.clone(), index, Some(comms), None)),
-                        (None, None) => Ok(Document::from_indexes(gallery.clone(), index, None, None)),
+                        (Some(Ok(comms)), Some(Ok(body))) => Ok(document_from_indexes(
+                            gallery.clone(),
+                            index,
+                            Some(comms),
+                            Some(body),
+                        )),
+                        (None, Some(Ok(body))) => Ok(document_from_indexes(
+                            gallery.clone(),
+                            index,
+                            None,
+                            Some(body),
+                        )),
+                        (Some(Ok(comms)), None) => Ok(document_from_indexes(
+                            gallery.clone(),
+                            index,
+                            Some(comms),
+                            None,
+                        )),
+                        (None, None) => {
+                            Ok(document_from_indexes(gallery.clone(), index, None, None))
+                        }
                         (Some(Err(err)), _) => Err(err),
                         (_, Some(Err(err))) => Err(err),
                     }
@@ -542,8 +577,8 @@ mod tests {
         for c in res {
             match c.author.kind {
                 UserKind::Static => assert!(c.author.id.is_some()),
-                UserKind::Dynamic  => assert!(c.author.ip.is_some()),
-                UserKind::Unknown  => assert_eq!(c.author.nickname, "댓글돌이".to_string()),
+                UserKind::Dynamic => assert!(c.author.ip.is_some()),
+                UserKind::Unknown => assert_eq!(c.author.nickname, "댓글돌이".to_string()),
             }
         }
         /*assert!(res.iter().any(|c| d.comment_count > 0));

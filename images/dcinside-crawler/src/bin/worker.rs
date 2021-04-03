@@ -8,6 +8,7 @@ use std::convert::TryInto;
 
 use dcinside_crawler::crawler::Crawler;
 use dcinside_crawler::model::*;
+use dcinside_model::*;
 
 use serde::Serialize;
 
@@ -429,24 +430,23 @@ mod tests {
             is_recommend: true,
             created_at: chrono::Utc::now(),
 
-            comments: Some(vec![
-                Comment {
-                    id: 1,
-                    author: User {
-                        ip: None,
-                        nickname: s(),
-                        id: Some(s()),
-                        kind: UserKind::Static,
-                    },
-                    depth: 0,
-                    kind: CommentKind::Text,
-                    contents: s(),
-                    parent_id: None,
-                    created_at: Some(chrono::Utc::now()),
-                }]),
-            body: None
+            comments: Some(vec![Comment {
+                id: 1,
+                author: User {
+                    ip: None,
+                    nickname: s(),
+                    id: Some(s()),
+                    kind: UserKind::Static,
+                },
+                depth: 0,
+                kind: CommentKind::Text,
+                contents: s(),
+                parent_id: None,
+                created_at: Some(chrono::Utc::now()),
+            }]),
+            body: None,
         };
-        let bytes = bincode::serialize(&doc).unwrap();
+        let _bytes = bincode::serialize(&doc).unwrap();
     }
 
     /*

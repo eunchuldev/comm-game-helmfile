@@ -42,3 +42,5 @@ rand = "0.8"
 nats = { version = "0.9", features = [] }
 
 flexbuffers = "0.2"
+
+dcinside-model = { path="dcinside-model" }
